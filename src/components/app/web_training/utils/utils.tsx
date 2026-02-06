@@ -34,6 +34,7 @@ export interface TrainingRecord {
   fechaInicio: string | null;
   fechaFin: string | null;
   estado: string | null;
+  formador: string | null;
   observaciones: string | null;
   campana: string | null;
 }
@@ -196,3 +197,25 @@ export const fetchSheetNovedades = async (): Promise<NovedadesRecord[]> => {
     return [];
   }
 };
+
+// URL del Web App de Google Apps Script
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwK5JdgsfnNW_hq3r-6Slz4O76B-XQh4m2y6YoCSHOkzKKuRXwu5bWl5E0S9vpjHMD3/exec";
+
+export const submitTrainingData = async (data: TrainingRecord[]): Promise<boolean> => {
+  try {
+    const response = await fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain",
+      },
+      body: JSON.stringify(data),
+    });
+    console.log("Datos enviados a Google Sheets (modo no-cors)");
+    return true;
+  } catch (error) {
+    console.error("Error al enviar datos a Google Sheets:", error);
+    throw error;
+  }
+};
+

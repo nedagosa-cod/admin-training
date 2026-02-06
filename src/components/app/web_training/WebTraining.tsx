@@ -12,6 +12,7 @@ import type {
 import CalendarTab from "./components/CalendarTab";
 import CampaignsTab from "./components/CampaignsTab";
 import ReportsTab from "./components/ReportsTab";
+import AddTrainingModal from "./components/AddTrainingModal";
 
 type Tab = "calendar" | "campaigns" | "reports";
 
@@ -23,30 +24,37 @@ export default function WebTraining() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
   const [showHelp, setShowHelp] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [records, festivosData, novedadesData] = await Promise.all([
+        fetchGoogleSheetData(),
+        fetchSheetFestivosData(),
+        fetchSheetNovedades(),
+      ]);
+      setData(records);
+      setFestivos(festivosData);
+      setNovedades(novedadesData);
+      setError(null);
+    } catch (err) {
+      setError("Error al cargar los datos de Google Sheets");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        const [records, festivosData, novedadesData] = await Promise.all([
-          fetchGoogleSheetData(),
-          fetchSheetFestivosData(),
-          fetchSheetNovedades(),
-        ]);
-        setData(records);
-        setFestivos(festivosData);
-        setNovedades(novedadesData);
-        setError(null);
-      } catch (err) {
-        setError("Error al cargar los datos de Google Sheets");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, []);
+
+  const handleSuccessAdd = () => {
+    // Recargar datos después de agregar
+    loadData();
+    // Opcional: Mostrar notificación de éxito
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-blue-50 to-indigo-50 p-8 flex flex-col">
@@ -55,31 +63,28 @@ export default function WebTraining() {
         <nav className="flex space-x-1 p-2">
           <button
             onClick={() => setActiveTab("calendar")}
-            className={`${
-              activeTab === "calendar"
+            className={`${activeTab === "calendar"
                 ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
                 : "text-gray-600 hover:bg-gray-100"
-            } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
+              } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
           >
             📅 Calendario
           </button>
           <button
             onClick={() => setActiveTab("campaigns")}
-            className={`${
-              activeTab === "campaigns"
+            className={`${activeTab === "campaigns"
                 ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
                 : "text-gray-600 hover:bg-gray-100"
-            } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
+              } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
           >
             📊 Consulta de Campañas
           </button>
           <button
             onClick={() => setActiveTab("reports")}
-            className={`${
-              activeTab === "reports"
+            className={`${activeTab === "reports"
                 ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
                 : "text-gray-600 hover:bg-gray-100"
-            } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
+              } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
           >
             📈 Reportes
           </button>
@@ -126,6 +131,15 @@ export default function WebTraining() {
         </div>
       )}
 
+      {/* Botón de Agregar Nuevo (Flotante) */}
+      <button
+        onClick={() => setShowAddModal(true)}
+        className="fixed bottom-28 right-8 bg-linear-to-r from-green-500 to-emerald-600 text-white rounded-full w-16 h-16 shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center font-bold text-3xl z-40 border-4 border-white"
+        title="Agregar Nuevo Registro"
+      >
+        +
+      </button>
+
       {/* Botón de ayuda flotante */}
       <button
         onClick={() => setShowHelp(true)}
@@ -134,6 +148,13 @@ export default function WebTraining() {
       >
         ?
       </button>
+
+      {/* Modal de Agregar Datos */}
+      <AddTrainingModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={handleSuccessAdd}
+      />
 
       {/* Modal de ayuda */}
       {showHelp && (
