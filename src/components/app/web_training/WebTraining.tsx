@@ -99,10 +99,11 @@ export default function WebTraining() {
     }
   };
 
-  const handleBatchUpdate = async (records: TrainingRecord[]) => {
+  const handleBatchUpdate = async (records: TrainingRecord[], deletedIds: number[] = []) => {
     try {
       setLoading(true);
-      // Actualizar secuencialmente para evitar conflictos en Sheets
+
+      // 1. Actualizar registros modificados
       for (const record of records) {
         await submitTrainingData({
           action: "update",
@@ -110,6 +111,19 @@ export default function WebTraining() {
           rowIndex: record.rowIndex,
         });
       }
+
+      // 2. Eliminar registros
+      if (deletedIds && deletedIds.length > 0) {
+        // Ordenar descendente para evitar problemas de índices movidos
+        const sortedIds = [...deletedIds].sort((a, b) => b - a);
+        for (const rowIndex of sortedIds) {
+          await submitTrainingData({
+            action: "delete",
+            rowIndex: rowIndex
+          });
+        }
+      }
+
       await loadData(); // Recargar todo una sola vez al final
     } catch (err) {
       console.error("Error updating records:", err);

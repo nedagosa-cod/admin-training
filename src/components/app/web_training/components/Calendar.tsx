@@ -27,6 +27,7 @@ import {
   BookCheck,
   CircleFadingArrowUp,
   ShieldX,
+  Trash2,
 } from "lucide-react";
 
 interface CalendarProps {
@@ -39,7 +40,7 @@ interface CalendarProps {
   setSelectedDay: (date: Date | null) => void;
   onEdit?: (record: TrainingRecord) => void;
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
-  onBatchUpdate?: (records: TrainingRecord[]) => Promise<void>;
+  onBatchUpdate?: (records: TrainingRecord[], deletedIds?: number[]) => Promise<void>;
 }
 
 // Interfaz para agrupar eventos por campaña
@@ -176,6 +177,8 @@ export default function Calendar({
 
   // Estado para cambios pendientes de guardar [rowIndex -> record]
   const [modifiedRecords, setModifiedRecords] = useState<Map<number, TrainingRecord>>(new Map());
+  // Estado para registros marcados para eliminar [Set<rowIndex>]
+  const [deletedRecordIndices, setDeletedRecordIndices] = useState<Set<number>>(new Set());
 
   // Función para guardar cambios en línea (buffer local)
   const handleSaveField = async (
@@ -215,14 +218,33 @@ export default function Calendar({
   };
 
   // Guardar todos los cambios
+  // Función para marcar registro para eliminar
+  const handleDeleteRecord = (record: TrainingRecord) => {
+    if (record.rowIndex === undefined) return;
+
+    setDeletedRecordIndices(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(record.rowIndex!)) {
+        newSet.delete(record.rowIndex!); // Toggle (undelete)
+      } else {
+        newSet.add(record.rowIndex!);
+      }
+      return newSet;
+    });
+  };
+
+  // Guardar todos los cambios
   const handleSaveChanges = async () => {
-    if (!onBatchUpdate || modifiedRecords.size === 0) return;
+    if (!onBatchUpdate || (modifiedRecords.size === 0 && deletedRecordIndices.size === 0)) return;
 
     const recordsToSave = Array.from(modifiedRecords.values());
-    await onBatchUpdate(recordsToSave);
+    const recordsToDelete = Array.from(deletedRecordIndices);
+
+    await onBatchUpdate(recordsToSave, recordsToDelete);
 
     // Limpiar cambios después de guardar
     setModifiedRecords(new Map());
+    setDeletedRecordIndices(new Set());
   };
 
   // Obtener todos los días del mes actual incluyendo días de semanas anteriores/posteriores
@@ -1124,7 +1146,10 @@ export default function Calendar({
                   {selectedEvent.desarrollos.map((desarrollo, idx) => (
                     <div
                       key={idx}
-                      className="bg-white rounded-lg p-5 shadow-md border-2 border-gray-200 hover:border-indigo-300 transition-all"
+                      className={`bg-white rounded-lg p-5 shadow-md border-2 border-gray-200 transition-all 
+                        ${desarrollo.originalRecord?.rowIndex && deletedRecordIndices.has(desarrollo.originalRecord.rowIndex)
+                          ? "opacity-50 border-red-200 bg-red-50 grayscale"
+                          : "hover:border-indigo-300"}`}
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
@@ -1160,6 +1185,18 @@ export default function Calendar({
                             className={`px-3 py-1.5 rounded-lg text-white font-bold text-sm shadow-md ${getStatusColor(desarrollo.estado)}`}
                           />
                         </div>
+                        {onBatchUpdate && desarrollo.originalRecord?.rowIndex && (
+                          <button
+                            onClick={() => handleDeleteRecord(desarrollo.originalRecord!)}
+                            className={`p-1.5 rounded-full transition-colors ${deletedRecordIndices.has(desarrollo.originalRecord.rowIndex)
+                              ? "bg-red-200 text-red-700 hover:bg-red-300"
+                              : "text-gray-400 hover:text-red-500 hover:bg-red-50"
+                              }`}
+                            title={deletedRecordIndices.has(desarrollo.originalRecord.rowIndex) ? "Restaurar" : "Eliminar"}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
@@ -1220,15 +1257,15 @@ export default function Calendar({
                 {onBatchUpdate && (
                   <button
                     onClick={handleSaveChanges}
-                    disabled={modifiedRecords.size === 0}
+                    disabled={modifiedRecords.size === 0 && deletedRecordIndices.size === 0}
                     className={`px-6 py-2 rounded-lg text-white font-bold transition-all transform hover:scale-105 shadow-md flex items-center gap-2
-                      ${modifiedRecords.size > 0
+                      ${(modifiedRecords.size > 0 || deletedRecordIndices.size > 0)
                         ? "bg-linear-to-r from-blue-600 to-indigo-600 hover:shadow-lg"
                         : "bg-gray-300 cursor-not-allowed text-gray-500"
                       }`}
                   >
                     <BookCheck className="w-5 h-5" />
-                    Guardar Cambios ({modifiedRecords.size})
+                    Guardar Cambios ({modifiedRecords.size + deletedRecordIndices.size})
                   </button>
                 )}
               </div>

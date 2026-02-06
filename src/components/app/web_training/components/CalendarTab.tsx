@@ -24,7 +24,7 @@ interface CalendarTabProps {
   novedades: NovedadesRecord[];
   onEdit?: (record: TrainingRecord) => void;
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
-  onBatchUpdate?: (records: TrainingRecord[]) => Promise<void>;
+  onBatchUpdate?: (records: TrainingRecord[], deletedIds?: number[]) => Promise<void>;
 }
 
 export default function CalendarTab({

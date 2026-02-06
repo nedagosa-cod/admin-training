@@ -16,54 +16,29 @@ function doPost(e) {
 
     var rawData = e.postData.contents;
     logToDebug(debugSheet, "Datos recibidos (length): " + rawData.length);
-    // logToDebug(debugSheet, "Snippet: " + rawData.substring(0, 100));
 
-    var data;
+    var payload;
     try {
-      data = JSON.parse(rawData);
+      payload = JSON.parse(rawData);
     } catch (parseError) {
       logToDebug(debugSheet, "Error JSON.parse: " + parseError.toString());
-      logToDebug(debugSheet, "Raw Data content: " + rawData);
       return createErrorResponse("Invalid JSON");
     }
 
     var sheet = doc.getSheetByName(sheetName);
     if (!sheet) {
-      logToDebug(debugSheet, "Error: Hoja " + sheetName + " no encontrada");
       return createErrorResponse("Sheet not found");
     }
 
-    var rowsToAdd = data.map(function(record) {
-      return [
-        record.fechaSolicitud || "",
-        record.coordinador || "",
-        record.cliente || "",
-        record.segmento || "",
-        record.desarrollador || "",
-        record.segmentoMenu || "",
-        record.desarrollo || "",
-        record.nombre || "",
-        record.cantidad || "",
-        record.fechaMaterial || "",
-        record.fechaInicio || "",
-        record.fechaFin || "",
-        record.estado || "",
-        record.formador || "",
-        record.observaciones || "",
-        record.campana || ""
-      ];
-    });
+    // Determinar acción: 'create' (default) o 'update'
+    var action = payload.action || 'create';
+    logToDebug(debugSheet, "Acción: " + action);
 
-    if (rowsToAdd.length > 0) {
-      sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAdd.length, rowsToAdd[0].length).setValues(rowsToAdd);
-      logToDebug(debugSheet, "Éxito: " + rowsToAdd.length + " filas agregadas");
+    if (action === 'update') {
+      return handleUpdate(sheet, payload, debugSheet);
     } else {
-      logToDebug(debugSheet, "Advertencia: Array de datos vacío");
+      return handleCreate(sheet, payload.data || payload, debugSheet);
     }
-
-    return ContentService
-      .createTextOutput(JSON.stringify({ "result": "success", "rows": rowsToAdd.length }))
-      .setMimeType(ContentService.MimeType.JSON);
 
   } catch (e) {
     logToDebug(debugSheet, "Error General: " + e.toString());
@@ -73,10 +48,75 @@ function doPost(e) {
   }
 }
 
+function handleCreate(sheet, data, debugSheet) {
+  // Soporta tanto array de registros como un solo registro
+  var records = Array.isArray(data) ? data : [data];
+  
+  var rowsToAdd = records.map(function(record) {
+    return mapRecordToRow(record);
+  });
+
+  if (rowsToAdd.length > 0) {
+    sheet.getRange(sheet.getLastRow() + 1, 1, rowsToAdd.length, rowsToAdd[0].length).setValues(rowsToAdd);
+    logToDebug(debugSheet, "Éxito: " + rowsToAdd.length + " filas agregadas");
+  }
+
+  return createSuccessResponse({ "rows": rowsToAdd.length, "action": "create" });
+}
+
+function handleUpdate(sheet, payload, debugSheet) {
+  var rowIndex = payload.rowIndex;
+  var record = payload.data;
+
+  if (!rowIndex || !record) {
+    return createErrorResponse("Missing rowIndex or data for update");
+  }
+
+  // Validar rowIndex (asegurar que es número y > 1)
+  // Nota: rowIndex viene del frontend. Si el frontend calcula index+2, aquí es directo.
+  // Es mejor usar número de fila 1-based directo.
+  
+  logToDebug(debugSheet, "Actualizando fila: " + rowIndex);
+  
+  var rowData = mapRecordToRow(record);
+  
+  // Actualizar la fila específica (col 1 a 16)
+  sheet.getRange(rowIndex, 1, 1, rowData.length).setValues([rowData]);
+  
+  return createSuccessResponse({ "updated": true, "rowIndex": rowIndex, "action": "update" });
+}
+
+function mapRecordToRow(record) {
+  return [
+    record.fechaSolicitud || "",
+    record.coordinador || "",
+    record.cliente || "",
+    record.segmento || "",
+    record.desarrollador || "",
+    record.segmentoMenu || "",
+    record.desarrollo || "",
+    record.nombre || "",
+    record.cantidad || "",
+    record.fechaMaterial || "",
+    record.fechaInicio || "",
+    record.fechaFin || "",
+    record.estado || "",
+    record.formador || "",
+    record.observaciones || "",
+    record.campana || ""
+  ];
+}
+
 function createErrorResponse(msg) {
   return ContentService
     .createTextOutput(JSON.stringify({ "result": "error", "error": msg }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function createSuccessResponse(data) {
+  return ContentService
+      .createTextOutput(JSON.stringify(Object.assign({ "result": "success" }, data)))
+      .setMimeType(ContentService.MimeType.JSON);
 }
 
 function getOrCreateDebugSheet(doc) {
