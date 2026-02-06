@@ -10,6 +10,8 @@ interface AddTrainingModalProps {
     coordinadores: string[];
     clientes: string[];
     tiposDesarrollo: string[];
+    isMinimized?: boolean;
+    onToggleMinimize?: () => void;
 }
 
 // Campos comunes para la cabecera
@@ -67,7 +69,9 @@ export default function AddTrainingModal({
     desarrolladores,
     coordinadores,
     clientes,
-    tiposDesarrollo
+    tiposDesarrollo,
+    isMinimized = false,
+    onToggleMinimize
 }: AddTrainingModalProps) {
     const [headerData, setHeaderData] = useState<HeaderData>(INITIAL_HEADER);
     const [rows, setRows] = useState<RowData[]>([{ ...INITIAL_ROW }]);
@@ -75,6 +79,40 @@ export default function AddTrainingModal({
     const [error, setError] = useState<string | null>(null);
 
     if (!isOpen) return null;
+
+    if (isMinimized) {
+        return (
+            <div className="fixed bottom-28 left-8 z-50 bg-white border border-gray-200 shadow-2xl rounded-lg p-4 flex items-center gap-4 animate-in slide-in-from-bottom-5 w-auto max-w-sm border-l-4 border-l-blue-600">
+                <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-full text-blue-600">
+                        <span>📝</span>
+                    </div>
+                    <div>
+                        <p className="font-bold text-sm text-gray-800">Registro en curso</p>
+                        <p className="text-xs text-gray-500 font-medium">{rows.length} desarrollo(s) agregado(s)</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 pl-4 border-l border-gray-200 ml-2">
+                    {onToggleMinimize && (
+                        <button
+                            onClick={onToggleMinimize}
+                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-md transition-colors"
+                            title="Restaurar"
+                        >
+                            <span className="text-lg">↗️</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-red-50 text-red-500 rounded-md transition-colors"
+                        title="Cerrar"
+                    >
+                        <span className="text-lg">✕</span>
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     const handleHeaderChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -150,13 +188,25 @@ export default function AddTrainingModal({
                     {/* Header del Modal */}
                     <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-t-xl">
                         <h2 className="text-xl font-bold">📝 Nuevo Registro de Entrenamiento</h2>
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="text-white hover:bg-white/20 rounded-full p-2 transition-colors"
-                        >
-                            ✕
-                        </button>
+                        <div className="flex items-center gap-2">
+                            {onToggleMinimize && (
+                                <button
+                                    type="button"
+                                    onClick={onToggleMinimize}
+                                    className="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition-colors font-bold text-xl mb-2"
+                                    title="Minimizar"
+                                >
+                                    _
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="text-white hover:bg-white/20 rounded-full w-8 h-8 flex items-center justify-center transition-colors"
+                            >
+                                ✕
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-6 space-y-8">

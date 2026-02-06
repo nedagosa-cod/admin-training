@@ -9,6 +9,7 @@ import type {
   FestivoRecord,
   NovedadesRecord,
 } from "./utils/utils";
+import { useAuth } from "@/context/AuthContext";
 import CalendarTab from "./components/CalendarTab";
 import CampaignsTab from "./components/CampaignsTab";
 import ReportsTab from "./components/ReportsTab";
@@ -17,6 +18,7 @@ import AddTrainingModal from "./components/AddTrainingModal";
 type Tab = "calendar" | "campaigns" | "reports";
 
 export default function WebTraining() {
+  const { isAdmin } = useAuth();
   const [data, setData] = useState<TrainingRecord[]>([]);
   const [festivos, setFestivos] = useState<FestivoRecord[]>([]);
   const [novedades, setNovedades] = useState<NovedadesRecord[]>([]);
@@ -25,6 +27,8 @@ export default function WebTraining() {
   const [coordinadores, setCoordinadores] = useState<string[]>([]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [tiposDesarrollo, setTiposDesarrollo] = useState<string[]>([]);
+
+  const [isModalMinimized, setIsModalMinimized] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -142,14 +146,16 @@ export default function WebTraining() {
         </div>
       )}
 
-      {/* Botón de Agregar Nuevo (Flotante) */}
-      <button
-        onClick={() => setShowAddModal(true)}
-        className="fixed bottom-28 right-8 bg-linear-to-r from-green-500 to-emerald-600 text-white rounded-full w-16 h-16 shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center font-bold text-3xl z-40 border-4 border-white"
-        title="Agregar Nuevo Registro"
-      >
-        +
-      </button>
+      {/* Botón de Agregar Nuevo (Flotante) - Solo Admin */}
+      {isAdmin && (
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="fixed bottom-28 right-8 bg-linear-to-r from-green-500 to-emerald-600 text-white rounded-full w-16 h-16 shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center font-bold text-3xl z-40 border-4 border-white"
+          title="Agregar Nuevo Registro"
+        >
+          +
+        </button>
+      )}
 
       {/* Botón de ayuda flotante */}
       <button
@@ -160,16 +166,20 @@ export default function WebTraining() {
         ?
       </button>
 
-      {/* Modal de Agregar Datos */}
-      <AddTrainingModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSuccess={handleSuccessAdd}
-        desarrolladores={desarrolladores}
-        coordinadores={coordinadores}
-        clientes={clientes}
-        tiposDesarrollo={tiposDesarrollo}
-      />
+      {/* Modal de Agregar Datos - Solo Admin */}
+      {isAdmin && (
+        <AddTrainingModal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSuccess={handleSuccessAdd}
+          desarrolladores={desarrolladores}
+          coordinadores={coordinadores}
+          clientes={clientes}
+          tiposDesarrollo={tiposDesarrollo}
+          isMinimized={isModalMinimized}
+          onToggleMinimize={() => setIsModalMinimized(!isModalMinimized)}
+        />
+      )}
 
       {/* Modal de ayuda */}
       {showHelp && (

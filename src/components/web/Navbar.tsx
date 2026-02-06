@@ -1,11 +1,28 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 export default function Navbar() {
   const location = useLocation();
+  const { isAdmin, login, logout } = useAuth();
 
   const isActive = (path: string) => {
     return location.pathname === path;
+  };
+
+  const handleAdminClick = () => {
+    if (isAdmin) {
+      if (confirm("¿Cerrar sesión de administrador?")) {
+        logout();
+      }
+    } else {
+      const password = prompt("Ingrese contraseña de administrador:");
+      if (password) {
+        if (!login(password)) {
+          alert("Contraseña incorrecta");
+        }
+      }
+    }
   };
 
   return (
@@ -66,8 +83,17 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* Status Indicator */}
-          <div className="flex items-center gap-2">
+          {/* Status Indicator & Admin Button */}
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleAdminClick}
+              className={`text-gray-300 hover:text-white hover:bg-gray-700 transition-colors ${isAdmin ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : ""}`}
+              title={isAdmin ? "Modo Admin Activo (Click para salir)" : "Acceso Admin"}
+            >
+              {isAdmin ? "🔓 Admin" : "🔒"}
+            </Button>
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           </div>
         </div>
