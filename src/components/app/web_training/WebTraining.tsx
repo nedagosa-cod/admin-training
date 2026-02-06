@@ -3,6 +3,7 @@ import {
   fetchGoogleSheetData,
   fetchMasterData,
   fetchSheetNovedades,
+  submitTrainingData,
 } from "./utils/utils";
 import type {
   TrainingRecord,
@@ -29,6 +30,7 @@ export default function WebTraining() {
   const [tiposDesarrollo, setTiposDesarrollo] = useState<string[]>([]);
 
   const [isModalMinimized, setIsModalMinimized] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<TrainingRecord | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,32 @@ export default function WebTraining() {
     // Recargar datos después de agregar
     loadData();
     // Opcional: Mostrar notificación de éxito
+    setEditingRecord(null); // Limpiar edición si hubo
+  };
+
+  const handleEdit = (record: TrainingRecord) => {
+    setEditingRecord(record);
+    setShowAddModal(true);
+    // Si estaba minimizado, restaurar
+    if (isModalMinimized) setIsModalMinimized(false);
+  };
+
+  const handleUpdateRecord = async (updatedRecord: TrainingRecord) => {
+    try {
+      setLoading(true);
+      await submitTrainingData({
+        action: "update",
+        data: updatedRecord,
+        rowIndex: updatedRecord.rowIndex,
+      });
+      await loadData(); // Recargar datos para reflejar cambios
+      setEditingRecord(null); // Limpiar si hubiera algo seleccionado (aunque es inline)
+    } catch (err) {
+      console.error("Error updating record:", err);
+      setError("Error al actualizar el registro");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -129,6 +157,8 @@ export default function WebTraining() {
               data={data}
               festivos={festivos}
               novedades={novedades}
+              onEdit={isAdmin ? handleEdit : undefined}
+              onUpdateRecord={isAdmin ? handleUpdateRecord : undefined}
             />
           )}
 
@@ -149,7 +179,10 @@ export default function WebTraining() {
       {/* Botón de Agregar Nuevo (Flotante) - Solo Admin */}
       {isAdmin && (
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={() => {
+            setEditingRecord(null); // Nuevo, limpieza
+            setShowAddModal(true);
+          }}
           className="fixed bottom-28 right-8 bg-linear-to-r from-green-500 to-emerald-600 text-white rounded-full w-16 h-16 shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 flex items-center justify-center font-bold text-3xl z-40 border-4 border-white"
           title="Agregar Nuevo Registro"
         >
@@ -170,7 +203,10 @@ export default function WebTraining() {
       {isAdmin && (
         <AddTrainingModal
           isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingRecord(null);
+          }}
           onSuccess={handleSuccessAdd}
           desarrolladores={desarrolladores}
           coordinadores={coordinadores}
@@ -178,6 +214,7 @@ export default function WebTraining() {
           tiposDesarrollo={tiposDesarrollo}
           isMinimized={isModalMinimized}
           onToggleMinimize={() => setIsModalMinimized(!isModalMinimized)}
+          initialData={editingRecord}
         />
       )}
 

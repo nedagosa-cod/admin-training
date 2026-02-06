@@ -22,12 +22,16 @@ interface CalendarTabProps {
   data: TrainingRecord[];
   festivos: FestivoRecord[];
   novedades: NovedadesRecord[];
+  onEdit?: (record: TrainingRecord) => void;
+  onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
 }
 
 export default function CalendarTab({
   data,
   festivos,
   novedades,
+  onEdit,
+  onUpdateRecord,
 }: CalendarTabProps) {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -146,6 +150,8 @@ export default function CalendarTab({
           selectedDay={selectedDay}
           setSelectedDay={setSelectedDay}
           novedades={novedades}
+          onEdit={onEdit}
+          onUpdateRecord={onUpdateRecord}
         />
       </div>
 
@@ -224,15 +230,26 @@ export default function CalendarTab({
                         .map((event, idx) => (
                           <div
                             key={idx}
-                            className="text-xs bg-linear-to-r from-purple-50 to-pink-50 rounded-lg px-3 py-2 border border-purple-100"
+                            className="flex items-center justify-between bg-linear-to-r from-purple-50 to-pink-50 rounded-lg px-3 py-2 border border-purple-100"
                           >
-                            <span className="font-bold text-purple-900">
-                              {event.campana}
-                            </span>
-                            <span className="text-gray-600">
-                              {" "}
-                              - {event.nombre}
-                            </span>
+                            <div className="text-xs">
+                              <span className="font-bold text-purple-900">
+                                {event.campana}
+                              </span>
+                              <span className="text-gray-600">
+                                {" "}
+                                - {event.nombre}
+                              </span>
+                            </div>
+                            {onEdit && (
+                              <button
+                                onClick={() => onEdit(event)}
+                                className="text-purple-400 hover:text-purple-700 p-1 hover:bg-purple-100 rounded transition-colors"
+                                title="Editar Registro"
+                              >
+                                ✏️
+                              </button>
+                            )}
                           </div>
                         ))}
                       {getEventsForDate(selectedDay).length > 5 && (

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { submitTrainingData } from "../utils/utils";
 import type { TrainingRecord } from "../utils/utils";
 
@@ -12,6 +12,7 @@ interface AddTrainingModalProps {
     tiposDesarrollo: string[];
     isMinimized?: boolean;
     onToggleMinimize?: () => void;
+    initialData?: TrainingRecord | null;
 }
 
 // Campos comunes para la cabecera
@@ -62,6 +63,50 @@ const INITIAL_ROW: RowData = {
     observaciones: "",
 };
 
+const mapRecordToHeader = (record: TrainingRecord): HeaderData => ({
+    coordinador: record.coordinador || "",
+    cliente: record.cliente || "",
+    segmento: record.segmento || "",
+    desarrollador: record.desarrollador || "",
+    segmentoMenu: record.segmentoMenu || "",
+    campana: record.campana || "",
+    formador: record.formador || "",
+    fechaSolicitud: record.fechaSolicitud || new Date().toISOString().split("T")[0],
+});
+
+const mapRecordToRow = (record: TrainingRecord): RowData => ({
+    id: crypto.randomUUID(),
+    desarrollo: record.desarrollo || "",
+    nombre: record.nombre || "",
+    cantidad: record.cantidad || "",
+    fechaMaterial: record.fechaMaterial || "",
+    fechaInicio: record.fechaInicio || "",
+    fechaFin: record.fechaFin || "",
+    estado: record.estado || "Pendiente",
+    observaciones: record.observaciones || "",
+});
+
+// Helper para convertir DD/MM/YYYY -> YYYY-MM-DD (para input date)
+const toInputDate = (dateStr: string | null): string => {
+    if (!dateStr) return "";
+    // Si ya es YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+
+    // Si es DD/MM/YYYY
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+        const [day, month, year] = dateStr.split('/');
+        return `${year}-${month}-${day}`;
+    }
+    return "";
+};
+
+// Helper para convertir YYYY-MM-DD -> DD/MM/YYYY (para guardar/state)
+const fromInputDate = (dateStr: string): string => {
+    if (!dateStr) return "";
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+};
+
 export default function AddTrainingModal({
     isOpen,
     onClose,
@@ -71,12 +116,23 @@ export default function AddTrainingModal({
     clientes,
     tiposDesarrollo,
     isMinimized = false,
-    onToggleMinimize
+    onToggleMinimize,
+    initialData
 }: AddTrainingModalProps) {
     const [headerData, setHeaderData] = useState<HeaderData>(INITIAL_HEADER);
     const [rows, setRows] = useState<RowData[]>([{ ...INITIAL_ROW }]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (initialData) {
+            setHeaderData(mapRecordToHeader(initialData));
+            setRows([mapRecordToRow(initialData)]);
+        } else {
+            setHeaderData(INITIAL_HEADER);
+            setRows([{ ...INITIAL_ROW, id: crypto.randomUUID() }]);
+        }
+    }, [initialData, isOpen]);
 
     if (!isOpen) return null;
 
@@ -126,6 +182,7 @@ export default function AddTrainingModal({
     };
 
     const addRow = () => {
+        if (isMinimized) return; // Prevent resizing in minimized mode
         setRows((prev) => [...prev, { ...INITIAL_ROW, id: crypto.randomUUID() }]);
     };
 
@@ -143,33 +200,56 @@ export default function AddTrainingModal({
             // Validaciones básicas
             if (!headerData.cliente) {
                 setError("Por favor complete los campos obligatorios (Cliente)");
+                setSubmitting(false);
                 return;
-            }    // Construir payload
-            const payload: TrainingRecord[] = rows.map((row) => ({
-                ...headerData,
-                // Mapear campos de fila a TrainingRecord
-                desarrollo: row.desarrollo,
-                nombre: row.nombre,
-                cantidad: row.cantidad,
-                fechaMaterial: row.fechaMaterial,
-                fechaInicio: row.fechaInicio,
-                fechaFin: row.fechaFin,
-                estado: row.estado,
-                observaciones: row.observaciones,
-                // Campos que no usamos en el form pero requiere la interfaz
-                // Aseguramos que sean string vacíos o lo que corresponda si son null en la interfaz
-                // La interfaz tiene 'string | null', así que null es válido o string vacío.
-                // Convertimos undefined s string vacíos para el form
+            }
 
-                // La interfaz TrainingRecord espera string | null.
-                // Aquí enviamos strings.
-            }));
+            if (initialData && initialData.rowIndex) {
+                // MODO EDICIÓN: Actualizar una sola fila
+                const row = rows[0];
+                const cleanRecord: TrainingRecord = {
+                    ...headerData,
+                    desarrollo: row.desarrollo,
+                    nombre: row.nombre,
+                    cantidad: row.cantidad,
+                    fechaMaterial: row.fechaMaterial,
+                    fechaInicio: row.fechaInicio,
+                    fechaFin: row.fechaFin,
+                    estado: row.estado,
+                    observaciones: row.observaciones,
+                    rowIndex: initialData.rowIndex, // Importante para identificar la fila
+                    // Asegurar campos nulos si están vacíos
+                    campana: headerData.campana || null,
+                    coordinador: headerData.coordinador || null,
+                    // ... mapear resto si es necesario, pero spread ...headerData y row fields cubren la mayoría
+                };
 
-            await submitTrainingData(payload);
+                await submitTrainingData({
+                    action: 'update',
+                    data: cleanRecord,
+                    rowIndex: initialData.rowIndex
+                });
+            } else {
+                // MODO CREACIÓN: Append normal
+                const payload: TrainingRecord[] = rows.map((row) => ({
+                    ...headerData,
+                    desarrollo: row.desarrollo,
+                    nombre: row.nombre,
+                    cantidad: row.cantidad,
+                    fechaMaterial: row.fechaMaterial,
+                    fechaInicio: row.fechaInicio,
+                    fechaFin: row.fechaFin,
+                    estado: row.estado,
+                    observaciones: row.observaciones,
+                }));
+                await submitTrainingData(payload);
+            }
 
             // Limpiar y cerrar
-            setHeaderData(INITIAL_HEADER);
-            setRows([{ ...INITIAL_ROW, id: crypto.randomUUID() }]);
+            if (!initialData) {
+                setHeaderData(INITIAL_HEADER);
+                setRows([{ ...INITIAL_ROW, id: crypto.randomUUID() }]);
+            }
             onSuccess();
             onClose();
 
@@ -186,8 +266,10 @@ export default function AddTrainingModal({
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl my-8">
                 <form onSubmit={handleSubmit} className="flex flex-col max-h-[90vh]">
                     {/* Header del Modal */}
-                    <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-linear-to-r from-blue-600 to-indigo-700 text-white rounded-t-xl">
-                        <h2 className="text-xl font-bold">📝 Nuevo Registro de Entrenamiento</h2>
+                    <div className={`p-6 border-b border-gray-200 flex justify-between items-center text-white rounded-t-xl ${initialData ? "bg-linear-to-r from-orange-500 to-red-600" : "bg-linear-to-r from-blue-600 to-indigo-700"}`}>
+                        <h2 className="text-xl font-bold">
+                            {initialData ? "✏️ Editar Registro" : "📝 Nuevo Registro de Entrenamiento"}
+                        </h2>
                         <div className="flex items-center gap-2">
                             {onToggleMinimize && (
                                 <button
@@ -373,24 +455,24 @@ export default function AddTrainingModal({
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="date"
-                                                        value={row.fechaMaterial}
-                                                        onChange={(e) => handleRowChange(row.id, "fechaMaterial", e.target.value)}
+                                                        value={toInputDate(row.fechaMaterial)}
+                                                        onChange={(e) => handleRowChange(row.id, "fechaMaterial", fromInputDate(e.target.value))}
                                                         className="w-full border-gray-200 rounded text-sm focus:ring-blue-500 focus:border-blue-500"
                                                     />
                                                 </td>
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="date"
-                                                        value={row.fechaInicio}
-                                                        onChange={(e) => handleRowChange(row.id, "fechaInicio", e.target.value)}
+                                                        value={toInputDate(row.fechaInicio)}
+                                                        onChange={(e) => handleRowChange(row.id, "fechaInicio", fromInputDate(e.target.value))}
                                                         className="w-full border-gray-200 rounded text-sm focus:ring-blue-500 focus:border-blue-500"
                                                     />
                                                 </td>
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="date"
-                                                        value={row.fechaFin}
-                                                        onChange={(e) => handleRowChange(row.id, "fechaFin", e.target.value)}
+                                                        value={toInputDate(row.fechaFin)}
+                                                        onChange={(e) => handleRowChange(row.id, "fechaFin", fromInputDate(e.target.value))}
                                                         className="w-full border-gray-200 rounded text-sm focus:ring-blue-500 focus:border-blue-500"
                                                     />
                                                 </td>
@@ -463,7 +545,7 @@ export default function AddTrainingModal({
                                 </>
                             ) : (
                                 <>
-                                    <span>💾</span> Guardar Registros
+                                    <span>{initialData ? "💾 Actualizar" : "💾 Guardar Registros"}</span>
                                 </>
                             )}
                         </button>

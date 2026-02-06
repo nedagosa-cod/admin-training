@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { parseDateString } from "../utils/utils";
 import {
   format,
   startOfMonth,
@@ -6,7 +7,6 @@ import {
   eachDayOfInterval,
   isSameMonth,
   isToday,
-  parseISO,
   isWithinInterval,
   addMonths,
   subMonths,
@@ -37,6 +37,8 @@ interface CalendarProps {
   setCurrentMonth: (date: Date) => void;
   selectedDay: Date | null;
   setSelectedDay: (date: Date | null) => void;
+  onEdit?: (record: TrainingRecord) => void;
+  onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
 }
 
 // Interfaz para agrupar eventos por campaña
@@ -54,8 +56,106 @@ interface GroupedEvent {
     cantidad: string | null;
     estado: string | null;
     observaciones: string | null;
+    originalRecord?: TrainingRecord;
   }>;
 }
+
+// Componente para edición en línea
+const EditableField = ({
+  value,
+  onSave,
+  type = "text",
+  className = "",
+  isEditingEnabled = false,
+  options = [],
+}: {
+  value: string | null;
+  onSave: (newValue: string) => void;
+  type?: "text" | "number" | "select" | "textarea";
+  className?: string;
+  isEditingEnabled?: boolean;
+  options?: string[];
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentValue, setCurrentValue] = useState(value || "");
+
+  useEffect(() => {
+    setCurrentValue(value || "");
+  }, [value]);
+
+  if (!isEditingEnabled) {
+    return <span className={className}>{value || "-"}</span>;
+  }
+
+  if (isEditing) {
+    const handleBlur = () => {
+      setIsEditing(false);
+      if (currentValue !== (value || "")) {
+        onSave(currentValue);
+      }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && type !== "textarea") {
+        handleBlur();
+      }
+      if (e.key === "Escape") {
+        setIsEditing(false);
+        setCurrentValue(value || "");
+      }
+    };
+
+    if (type === "select") {
+      return (
+        <select
+          value={currentValue}
+          onChange={(e) => setCurrentValue(e.target.value)}
+          onBlur={handleBlur}
+          autoFocus
+          className="border rounded px-2 py-1 text-sm w-full bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="">Seleccionar...</option>
+          {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+        </select>
+      );
+    }
+
+    if (type === "textarea") {
+      return (
+        <textarea
+          value={currentValue}
+          onChange={(e) => setCurrentValue(e.target.value)}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          autoFocus
+          className="border rounded px-2 py-1 text-sm w-full bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 min-h-[60px]"
+        />
+      )
+    }
+
+    return (
+      <input
+        type={type}
+        value={currentValue}
+        onChange={(e) => setCurrentValue(e.target.value)}
+        onBlur={handleBlur}
+        onKeyDown={handleKeyDown}
+        autoFocus
+        className="border rounded px-2 py-1 text-sm w-full bg-white text-gray-900 focus:ring-2 focus:ring-blue-500"
+      />
+    );
+  }
+
+  return (
+    <span
+      onClick={() => setIsEditing(true)}
+      className={`${className} cursor-pointer hover:bg-yellow-100 hover:text-yellow-900 px-1 rounded transition-colors border border-transparent hover:border-yellow-300`}
+      title="Clic para editar"
+    >
+      {value || <span className="text-gray-400 italic">Clic para editar</span>}
+    </span>
+  );
+};
 
 export default function Calendar({
   data,
@@ -65,6 +165,7 @@ export default function Calendar({
   selectedDay,
   setSelectedDay,
   novedades,
+  onUpdateRecord,
 }: CalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<GroupedEvent | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
@@ -91,53 +192,23 @@ export default function Calendar({
       if (!record.fechaInicio || !record.fechaFin) return false;
 
       try {
-        // Intentar parsear diferentes formatos de fecha
-        let startDate: Date;
-        let endDate: Date;
+        const startDate = parseDateString(record.fechaInicio);
+        const endDate = parseDateString(record.fechaFin);
 
-        // Si la fecha viene en formato "Date(año, mes, día)"
-        if (record.fechaInicio.includes("Date(")) {
-          const startMatch = record.fechaInicio.match(
-            /Date\((\d+),(\d+),(\d+)\)/
-          );
-          if (startMatch) {
-            startDate = new Date(
-              parseInt(startMatch[1]),
-              parseInt(startMatch[2]),
-              parseInt(startMatch[3])
-            );
-          } else {
-            return false;
-          }
-        } else {
-          // Intentar parsear como fecha normal
-          startDate = parseISO(record.fechaInicio);
+        if (startDate && endDate) {
+          // Verificar si hay algún día del mes dentro del rango
+          // Nota: aquí la lógica original comparaba con currentMonth pero el nombre de la función es getEventsForDate(date)
+          // Sin embargo, esta función se usa para mostrar EVENTOS DEL DÍA SELECCIONADO.
+          // La lógica original usaba isWithinInterval.
+          return isWithinInterval(date, { start: startDate, end: endDate });
         }
-
-        if (record.fechaFin.includes("Date(")) {
-          const endMatch = record.fechaFin.match(/Date\((\d+),(\d+),(\d+)\)/);
-          if (endMatch) {
-            endDate = new Date(
-              parseInt(endMatch[1]),
-              parseInt(endMatch[2]),
-              parseInt(endMatch[3])
-            );
-          } else {
-            return false;
-          }
-        } else {
-          endDate = parseISO(record.fechaFin);
-        }
-
-        // Verificar si la fecha está dentro del rango
-        return isWithinInterval(date, { start: startDate, end: endDate });
+        return false;
       } catch (error) {
-        console.error("Error parseando fecha:", error, record);
+        console.error("Error parseando fechas:", error, record);
         return false;
       }
     });
   };
-
   // Función para agrupar eventos por campaña
   const groupEventsByCampaign = (events: TrainingRecord[]): GroupedEvent[] => {
     const grouped = new Map<string, GroupedEvent>();
@@ -165,6 +236,7 @@ export default function Calendar({
         cantidad: event.cantidad,
         estado: event.estado,
         observaciones: event.observaciones,
+        originalRecord: event,
       });
     });
 
@@ -179,24 +251,9 @@ export default function Calendar({
       if (!festivo.festivo) continue;
 
       try {
-        let festivoDate: Date;
+        const festivoDate = parseDateString(festivo.festivo);
 
-        // Si la fecha viene en formato "Date(año, mes, día)"
-        if (festivo.festivo.includes("Date(")) {
-          const match = festivo.festivo.match(/Date\((\d+),(\d+),(\d+)\)/);
-          if (match) {
-            festivoDate = new Date(
-              parseInt(match[1]),
-              parseInt(match[2]),
-              parseInt(match[3])
-            );
-          } else {
-            continue;
-          }
-        } else {
-          // Intentar parsear como fecha normal
-          festivoDate = parseISO(festivo.festivo);
-        }
+        if (!festivoDate) continue;
 
         // Comparar solo año, mes y día
         if (
@@ -220,49 +277,43 @@ export default function Calendar({
       if (!novedad.fechaInicio || !novedad.fechaFin) return false;
 
       try {
-        let startDate: Date;
-        let endDate: Date;
+        const startDate = parseDateString(novedad.fechaInicio);
+        const endDate = parseDateString(novedad.fechaFin);
 
-        // Si la fecha viene en formato "Date(año, mes, día)"
-        if (novedad.fechaInicio.includes("Date(")) {
-          const startMatch = novedad.fechaInicio.match(
-            /Date\((\d+),(\d+),(\d+)\)/
-          );
-          if (startMatch) {
-            startDate = new Date(
-              parseInt(startMatch[1]),
-              parseInt(startMatch[2]),
-              parseInt(startMatch[3])
-            );
-          } else {
-            return false;
-          }
-        } else {
-          startDate = parseISO(novedad.fechaInicio);
+        if (startDate && endDate) {
+          return isWithinInterval(date, { start: startDate, end: endDate });
         }
-
-        if (novedad.fechaFin.includes("Date(")) {
-          const endMatch = novedad.fechaFin.match(/Date\((\d+),(\d+),(\d+)\)/);
-          if (endMatch) {
-            endDate = new Date(
-              parseInt(endMatch[1]),
-              parseInt(endMatch[2]),
-              parseInt(endMatch[3])
-            );
-          } else {
-            return false;
-          }
-        } else {
-          endDate = parseISO(novedad.fechaFin);
-        }
-
-        // Verificar si la fecha está dentro del rango
-        return isWithinInterval(date, { start: startDate, end: endDate });
+        return false;
       } catch (error) {
         console.error("Error parseando fecha de novedad:", error, novedad);
         return false;
       }
     });
+  };
+
+  // Función para guardar cambios en línea
+  const handleSaveField = async (
+    originalRecord: TrainingRecord,
+    field: keyof TrainingRecord,
+    newValue: string
+  ) => {
+    if (!onUpdateRecord) return;
+
+    const updatedRecord = { ...originalRecord, [field]: newValue };
+
+    // Optimistic update (opcional, por ahora confiamos en el reload del padre)
+    // Pero actualizamos el selectedEvent para que se refleje en el modal abierto
+    if (selectedEvent) {
+      const updatedDesarrollos = selectedEvent.desarrollos.map(cat => {
+        if (cat.originalRecord === originalRecord) {
+          return { ...cat, [field]: newValue, originalRecord: updatedRecord };
+        }
+        return cat;
+      });
+      setSelectedEvent({ ...selectedEvent, desarrollos: updatedDesarrollos });
+    }
+
+    await onUpdateRecord(updatedRecord);
   };
 
   // Paleta de colores para campañas (50+ colores distintos)
@@ -394,40 +445,10 @@ export default function Calendar({
       return { isStart: false, isEnd: false };
 
     try {
-      let startDate: Date;
-      let endDate: Date;
+      const startDate = parseDateString(event.fechaInicio);
+      const endDate = parseDateString(event.fechaFin);
 
-      // Parsear fecha de inicio
-      if (event.fechaInicio.includes("Date(")) {
-        const startMatch = event.fechaInicio.match(/Date\((\d+),(\d+),(\d+)\)/);
-        if (startMatch) {
-          startDate = new Date(
-            parseInt(startMatch[1]),
-            parseInt(startMatch[2]),
-            parseInt(startMatch[3])
-          );
-        } else {
-          return { isStart: false, isEnd: false };
-        }
-      } else {
-        startDate = parseISO(event.fechaInicio);
-      }
-
-      // Parsear fecha de fin
-      if (event.fechaFin.includes("Date(")) {
-        const endMatch = event.fechaFin.match(/Date\((\d+),(\d+),(\d+)\)/);
-        if (endMatch) {
-          endDate = new Date(
-            parseInt(endMatch[1]),
-            parseInt(endMatch[2]),
-            parseInt(endMatch[3])
-          );
-        } else {
-          return { isStart: false, isEnd: false };
-        }
-      } else {
-        endDate = parseISO(event.fechaFin);
-      }
+      if (!startDate || !endDate) return { isStart: false, isEnd: false };
 
       // Comparar solo año, mes y día
       const isStart =
@@ -451,75 +472,33 @@ export default function Calendar({
   const formatDateString = (dateString: string | null): string => {
     if (!dateString) return "";
 
-    // Si la fecha viene en formato "Date(año, mes, día)"
-    if (dateString.includes("Date(")) {
-      const match = dateString.match(/Date\((\d+),(\d+),(\d+)\)/);
-      if (match) {
-        const year = match[1];
-        const month = parseInt(match[2]) + 1; // Los meses en JavaScript empiezan en 0
-        const day = match[3];
-        return `${day}/${month}/${year}`;
-      }
-    }
+    // Si ya viene como DD/MM/YYYY, devolver tal cual
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateString)) return dateString;
 
-    // Si ya viene en otro formato, intentar parsearlo
-    try {
-      const date = parseISO(dateString);
-      return format(date, "d/M/yyyy");
-    } catch {
-      return dateString; // Si no se puede parsear, devolver tal cual
-    }
+    const date = parseDateString(dateString);
+    if (!date) return dateString || "";
+
+    return format(date, "dd/MM/yyyy");
   };
 
   // Obtener campañas activas del mes actual
   const getActiveCampaigns = (): string[] => {
     const campaignsInMonth = data.filter((record) => {
-      if (!record.fechaInicio || !record.fechaFin || !record.campana)
-        return false;
+      // Verificar si hay fechas válidas
+      if (!record.fechaInicio || !record.fechaFin) return false;
 
       try {
-        let startDate: Date;
-        let endDate: Date;
+        const startDate = parseDateString(record.fechaInicio);
+        const endDate = parseDateString(record.fechaFin);
 
-        // Parsear fecha de inicio
-        if (record.fechaInicio.includes("Date(")) {
-          const startMatch = record.fechaInicio.match(
-            /Date\((\d+),(\d+),(\d+)\)/
-          );
-          if (startMatch) {
-            startDate = new Date(
-              parseInt(startMatch[1]),
-              parseInt(startMatch[2]),
-              parseInt(startMatch[3])
-            );
-          } else {
-            return false;
-          }
-        } else {
-          startDate = parseISO(record.fechaInicio);
+        if (startDate && endDate) {
+          // Verificar si hay algún día del mes dentro del rango
+          const monthStartDate = startOfMonth(currentMonth);
+          const monthEndDate = endOfMonth(currentMonth);
+
+          return startDate <= monthEndDate && endDate >= monthStartDate;
         }
-
-        // Parsear fecha de fin
-        if (record.fechaFin.includes("Date(")) {
-          const endMatch = record.fechaFin.match(/Date\((\d+),(\d+),(\d+)\)/);
-          if (endMatch) {
-            endDate = new Date(
-              parseInt(endMatch[1]),
-              parseInt(endMatch[2]),
-              parseInt(endMatch[3])
-            );
-          } else {
-            return false;
-          }
-        } else {
-          endDate = parseISO(record.fechaFin);
-        }
-
-        // Verificar si hay algún día del mes dentro del rango
-        const monthStartDate = startOfMonth(currentMonth);
-        const monthEndDate = endOfMonth(currentMonth);
-
-        return startDate <= monthEndDate && endDate >= monthStartDate;
+        return false;
       } catch (error) {
         console.error("Error parseando fechas:", error, record);
         return false;
@@ -662,13 +641,12 @@ export default function Calendar({
                           selectedCampaign === campaign ? null : campaign
                         )
                       }
-                      className={`px-3 py-1 rounded shadow-sm hover:shadow-md transition-all transform hover:scale-105 cursor-pointer ${
-                        selectedCampaign === campaign
-                          ? "bg-white text-gray-800 ring-2 ring-white"
-                          : `${getCampaignColor(
-                              campaign
-                            )} text-white ring-1 ring-white/30`
-                      }`}
+                      className={`px-3 py-1 rounded shadow-sm hover:shadow-md transition-all transform hover:scale-105 cursor-pointer ${selectedCampaign === campaign
+                        ? "bg-white text-gray-800 ring-2 ring-white"
+                        : `${getCampaignColor(
+                          campaign
+                        )} text-white ring-1 ring-white/30`
+                        }`}
                       title={
                         selectedCampaign === campaign
                           ? "Clic para quitar filtro"
@@ -715,20 +693,18 @@ export default function Calendar({
                 className={`
                   border-2 rounded-xl p-3 min-h-[100px] flex flex-col cursor-pointer
                   transition-all hover:shadow-xl transform hover:scale-105
-                  ${
-                    holidayInfo.isHoliday
-                      ? "bg-red-100 border-red-400"
-                      : isCurrentMonth
+                  ${holidayInfo.isHoliday
+                    ? "bg-red-100 border-red-400"
+                    : isCurrentMonth
                       ? "bg-white border-gray-200"
                       : "bg-gray-100 border-gray-300"
                   }
                   ${isCurrentDay ? "ring-4 ring-blue-400 shadow-lg" : ""}
-                  ${
-                    selectedDay &&
+                  ${selectedDay &&
                     format(selectedDay, "yyyy-MM-dd") ===
-                      format(day, "yyyy-MM-dd")
-                      ? "ring-4 ring-purple-400 shadow-lg"
-                      : ""
+                    format(day, "yyyy-MM-dd")
+                    ? "ring-4 ring-purple-400 shadow-lg"
+                    : ""
                   }
                 `}
               >
@@ -737,13 +713,12 @@ export default function Calendar({
                     className={`
                     text-sm font-bold mb-2 flex items-center justify-center w-7 h-7 rounded-full
                     ${isCurrentMonth ? "text-gray-900" : "text-gray-500"}
-                    ${
-                      isCurrentDay
+                    ${isCurrentDay
                         ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white"
                         : holidayInfo.isHoliday
-                        ? "bg-red-600 text-white"
-                        : ""
-                    }
+                          ? "bg-red-600 text-white"
+                          : ""
+                      }
                   `}
                   >
                     {format(day, "d")}
@@ -755,9 +730,8 @@ export default function Calendar({
                         className={`w-2 h-2 transform rotate-45 shadow-sm mb-2 ring-2 ring-red-800 ${getDeveloperColor(
                           novedad.desarrollador
                         )}`}
-                        title={`${
-                          novedad.desarrollador || "Sin desarrollador"
-                        }: ${novedad.novedad || "Sin descripción"}`}
+                        title={`${novedad.desarrollador || "Sin desarrollador"
+                          }: ${novedad.novedad || "Sin descripción"}`}
                       ></div>
                     ))}
                   </div>
@@ -833,17 +807,14 @@ export default function Calendar({
                               ${getCampaignColor(event.campana)} text-white
                               hover:opacity-90 transition-all shadow-md hover:shadow-lg transform hover:scale-105 
                               truncate
-                              ${
-                                isFiltered
-                                  ? "opacity-30 grayscale saturate-0"
-                                  : ""
-                              }
+                              ${isFiltered
+                                      ? "opacity-30 grayscale saturate-0"
+                                      : ""
+                                    }
                             `}
-                                  title={`${event.campana || "Sin campaña"} (${
-                                    event.desarrollos.length
-                                  } desarrollo${
-                                    event.desarrollos.length > 1 ? "s" : ""
-                                  })`}
+                                  title={`${event.campana || "Sin campaña"} (${event.desarrollos.length
+                                    } desarrollo${event.desarrollos.length > 1 ? "s" : ""
+                                    })`}
                                 >
                                   <p className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold hidden 2xl:block">
                                     {event.desarrollador
@@ -930,17 +901,14 @@ export default function Calendar({
                               ${getCampaignColor(event.campana)} text-white
                               hover:opacity-90 transition-all shadow-md hover:shadow-lg transform hover:scale-105 
                               truncate
-                              ${
-                                isFiltered
-                                  ? "opacity-30 grayscale saturate-0"
-                                  : ""
-                              }
+                              ${isFiltered
+                                        ? "opacity-30 grayscale saturate-0"
+                                        : ""
+                                      }
                             `}
-                                    title={`${
-                                      event.campana || "Sin campaña"
-                                    } (${event.desarrollos.length} desarrollo${
-                                      event.desarrollos.length > 1 ? "s" : ""
-                                    })`}
+                                    title={`${event.campana || "Sin campaña"
+                                      } (${event.desarrollos.length} desarrollo${event.desarrollos.length > 1 ? "s" : ""
+                                      })`}
                                   >
                                     <p className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-semibold hidden 2xl:block">
                                       {event.desarrollador
@@ -995,21 +963,18 @@ export default function Calendar({
                               flex-1 min-w-0
                               text-left text-[8px] 2xl:px-2 px-1 py-1 rounded-lg flex justify-between items-center gap-1
                               ${getCampaignColor(
-                                event.campana
-                              )} text-white 2xl:ring-2 ring-1 ring-red-500
+                                      event.campana
+                                    )} text-white 2xl:ring-2 ring-1 ring-red-500
                               hover:opacity-90 transition-all shadow-md hover:shadow-lg transform hover:scale-105 
                               truncate
-                              ${
-                                isFiltered
-                                  ? "opacity-30 grayscale saturate-0"
-                                  : ""
-                              }
+                              ${isFiltered
+                                        ? "opacity-30 grayscale saturate-0"
+                                        : ""
+                                      }
                             `}
-                                    title={`${
-                                      event.campana || "Sin campaña"
-                                    } (${event.desarrollos.length} desarrollo${
-                                      event.desarrollos.length > 1 ? "s" : ""
-                                    })`}
+                                    title={`${event.campana || "Sin campaña"
+                                      } (${event.desarrollos.length} desarrollo${event.desarrollos.length > 1 ? "s" : ""
+                                      })`}
                                   ></button>
                                 );
                               })}
@@ -1133,27 +1098,38 @@ export default function Calendar({
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1">
-                          <h5 className="text-lg font-bold text-gray-900 mb-1">
-                            {desarrollo.nombre || "Sin nombre"}
+                          <h5 className="text-lg font-bold text-gray-900 mb-1 flex items-center gap-2">
+                            <EditableField
+                              value={desarrollo.nombre}
+                              onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'nombre', val)}
+                              isEditingEnabled={!!onUpdateRecord}
+                              className="hover:bg-gray-100 px-1 rounded"
+                            />
                           </h5>
                           {desarrollo.desarrollo && (
                             <p className="text-sm text-gray-600 flex items-center gap-2">
                               <span className="font-semibold">Tipo:</span>
-                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-md font-medium">
-                                {desarrollo.desarrollo}
-                              </span>
+                              <EditableField
+                                value={desarrollo.desarrollo}
+                                onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'desarrollo', val)}
+                                isEditingEnabled={!!onUpdateRecord}
+                                type="select"
+                                options={["Evolutivo", "Garantía", "Incidencia", "Proyecto", "Soporte", "Actualizacion"]} // TODO: Usar lista maestra si es posible pasarla
+                                className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-md font-medium"
+                              />
                             </p>
                           )}
                         </div>
-                        {desarrollo.estado && (
-                          <span
-                            className={`px-3 py-1.5 rounded-lg text-white font-bold text-sm shadow-md ${getStatusColor(
-                              desarrollo.estado
-                            )}`}
-                          >
-                            {desarrollo.estado}
-                          </span>
-                        )}
+                        <div className="flex flex-col items-end gap-2">
+                          <EditableField
+                            value={desarrollo.estado}
+                            onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'estado', val)}
+                            isEditingEnabled={!!onUpdateRecord}
+                            type="select"
+                            options={["Entregado", "Finalizado", "Cancelado", "En Proceso", "Proyectado", "Pendiente", "Incumplimiento", "Stand By"]}
+                            className={`px-3 py-1.5 rounded-lg text-white font-bold text-sm shadow-md ${getStatusColor(desarrollo.estado)}`}
+                          />
+                        </div>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
@@ -1162,9 +1138,12 @@ export default function Calendar({
                             <span className="font-semibold text-gray-700 text-sm">
                               Segmento:
                             </span>
-                            <span className="text-gray-900 bg-blue-50 px-2 py-1 rounded">
-                              {desarrollo.segmento}
-                            </span>
+                            <EditableField
+                              value={desarrollo.segmento}
+                              onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'segmento', val)}
+                              isEditingEnabled={!!onUpdateRecord}
+                              className="text-gray-900 bg-blue-50 px-2 py-1 rounded"
+                            />
                           </div>
                         )}
                         {desarrollo.cantidad && (
@@ -1172,23 +1151,29 @@ export default function Calendar({
                             <span className="font-semibold text-gray-700 text-sm">
                               Cantidad:
                             </span>
-                            <span className="text-gray-900 bg-green-50 px-2 py-1 rounded font-medium">
-                              {desarrollo.cantidad}
-                            </span>
+                            <EditableField
+                              value={desarrollo.cantidad}
+                              onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'cantidad', val)}
+                              isEditingEnabled={!!onUpdateRecord}
+                              type="number"
+                              className="text-gray-900 bg-green-50 px-2 py-1 rounded font-medium"
+                            />
                           </div>
                         )}
                       </div>
 
-                      {desarrollo.observaciones && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <span className="font-semibold text-gray-700 text-sm block mb-1">
-                            Observaciones:
-                          </span>
-                          <p className="text-gray-800 text-sm bg-gray-50 p-2 rounded">
-                            {desarrollo.observaciones}
-                          </p>
-                        </div>
-                      )}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <span className="font-semibold text-gray-700 text-sm block mb-1">
+                          Observaciones:
+                        </span>
+                        <EditableField
+                          value={desarrollo.observaciones}
+                          onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'observaciones', val)}
+                          isEditingEnabled={!!onUpdateRecord}
+                          type="textarea"
+                          className="text-gray-800 text-sm bg-gray-50 p-2 rounded w-full block"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

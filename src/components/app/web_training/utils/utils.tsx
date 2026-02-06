@@ -37,6 +37,7 @@ export interface TrainingRecord {
   formador: string | null;
   observaciones: string | null;
   campana: string | null;
+  rowIndex?: number; // Para edición
 }
 
 export interface FestivoRecord {
@@ -50,6 +51,54 @@ export interface NovedadesRecord {
   fechaFin: string | null;
   novedad: string | null;
 }
+
+// Helper para normalizar fechas de Google Viz "Date(y,m,d)" a "DD/MM/YYYY"
+const normalizeGvizDate = (value: string | null): string | null => {
+  if (!value) return null;
+
+  // Si viene con formato Date(y,m,d)
+  if (typeof value === 'string' && value.includes("Date(")) {
+    const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
+    if (match) {
+      const year = match[1];
+      const month = parseInt(match[2]) + 1; // Gviz usa meses 0-based
+      const day = match[3];
+      // Pad con ceros
+      const m = month < 10 ? `0${month}` : month;
+      const d = parseInt(day) < 10 ? `0${day}` : day;
+      return `${d}/${m}/${year}`;
+    }
+  }
+
+  // Si viene YYYY-MM-DD (ISO), convertir a DD/MM/YYYY
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-');
+    return `${day}/${month}/${year}`;
+  }
+
+  return value;
+};
+
+// Helper para parsear fechas string (DD/MM/YYYY o ISO) a Date object
+export const parseDateString = (dateStr: string | null): Date | null => {
+  if (!dateStr) return null;
+
+  // Si es DD/MM/YYYY
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
+    const [day, month, year] = dateStr.split('/').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  // Si es ISO YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+
+  // Intento fallback
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? null : d;
+};
 
 export const fetchGoogleSheetData = async (): Promise<TrainingRecord[]> => {
   try {
@@ -75,10 +124,11 @@ export const fetchGoogleSheetData = async (): Promise<TrainingRecord[]> => {
 
       // Convertir a formato TrainingRecord
       const formattedData: TrainingRecord[] = rows
-        .slice(0)
-        .map((row: SheetRow) => {
+        .slice(0) // Asumiendo que row 0 ya es dato si usamos GID adecuado, o ajustar slice
+        .map((row: SheetRow, index: number) => {
           return {
-            fechaSolicitud: row.c[0] ? String(row.c[0].v) : null,
+            rowIndex: index + 2, // Fila en Sheet (Header es 1, index 0 es 2)
+            fechaSolicitud: normalizeGvizDate(row.c[0] ? String(row.c[0].v) : null),
             coordinador: row.c[1] ? String(row.c[1].v) : null,
             cliente: row.c[2] ? String(row.c[2].v) : null,
             segmento: row.c[3] ? String(row.c[3].v) : null,
@@ -87,9 +137,9 @@ export const fetchGoogleSheetData = async (): Promise<TrainingRecord[]> => {
             desarrollo: row.c[6] ? String(row.c[6].v) : null,
             nombre: row.c[7] ? String(row.c[7].v) : null,
             cantidad: row.c[8] ? String(row.c[8].v) : null,
-            fechaMaterial: row.c[9] ? String(row.c[9].v) : null,
-            fechaInicio: row.c[10] ? String(row.c[10].v) : null,
-            fechaFin: row.c[11] ? String(row.c[11].v) : null,
+            fechaMaterial: normalizeGvizDate(row.c[9] ? String(row.c[9].v) : null),
+            fechaInicio: normalizeGvizDate(row.c[10] ? String(row.c[10].v) : null),
+            fechaFin: normalizeGvizDate(row.c[11] ? String(row.c[11].v) : null),
             estado: row.c[12] ? String(row.c[12].v) : null,
             formador: row.c[13] ? String(row.c[13].v) : null,
             observaciones: row.c[14] ? String(row.c[14].v) : null,
@@ -146,7 +196,7 @@ export const fetchMasterData = async (): Promise<MasterData> => {
         // Festivos (Columnas D=3, E=4)
         if (row.c[3] && row.c[4]) {
           festivos.push({
-            festivo: String(row.c[3].v),
+            festivo: normalizeGvizDate(String(row.c[3].v)) || "",
             festividad: String(row.c[4].v),
           });
         }
@@ -205,8 +255,8 @@ export const fetchSheetNovedades = async (): Promise<NovedadesRecord[]> => {
         .map((row: SheetRow) => {
           return {
             desarrollador: row.c[0] ? String(row.c[0].v) : null,
-            fechaInicio: row.c[1] ? String(row.c[1].v) : null,
-            fechaFin: row.c[2] ? String(row.c[2].v) : null,
+            fechaInicio: normalizeGvizDate(row.c[1] ? String(row.c[1].v) : null),
+            fechaFin: normalizeGvizDate(row.c[2] ? String(row.c[2].v) : null),
             novedad: row.c[3] ? String(row.c[3].v) : null,
           };
         });
@@ -228,17 +278,27 @@ export const fetchSheetNovedades = async (): Promise<NovedadesRecord[]> => {
 // URL del Web App de Google Apps Script
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwK5JdgsfnNW_hq3r-6Slz4O76B-XQh4m2y6YoCSHOkzKKuRXwu5bWl5E0S9vpjHMD3/exec";
 
-export const submitTrainingData = async (data: TrainingRecord[]): Promise<boolean> => {
+export const submitTrainingData = async (data: TrainingRecord[] | any): Promise<boolean> => {
   try {
-    const response = await fetch(GAS_URL, {
+    // Si es un array, asumimos que es CREAR múltiples (legacy/actual)
+    // Si enviamos un objeto con { action: 'update' }, es actualización.
+
+    let payload;
+    if (Array.isArray(data)) {
+      payload = { action: 'create', data: data };
+    } else {
+      payload = data; // Ya viene con estructura { action, data, rowIndex }
+    }
+
+    await fetch(GAS_URL, {
       method: "POST",
       mode: "no-cors",
       headers: {
         "Content-Type": "text/plain",
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
-    console.log("Datos enviados a Google Sheets (modo no-cors)");
+    console.log("Datos enviados a Google Sheets (modo no-cors)", payload);
     return true;
   } catch (error) {
     console.error("Error al enviar datos a Google Sheets:", error);
