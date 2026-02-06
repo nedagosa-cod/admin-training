@@ -200,18 +200,15 @@ export default function Calendar({
       setSelectedEvent({ ...selectedEvent, desarrollos: updatedDesarrollos });
     }
 
-    // 2. Guardar en buffer de cambios (usando rowIndex como clave si existe, o alguna clave única)
-    // Asumimos que originalRecord tiene un identificador único o usaremos su referencia si no
-    // Pero TrainingRecord viene de Google Sheets y suele tener rowIndex.
-    // Si no tiene, usaremos el objeto mismo como clave si fuera Map<TrainingRecord, TrainingRecord>, pero React state mejor serializable.
-    // Vamos a usar el rowIndex que viene de Sheets.
+    // 2. Guardar en buffer de cambios
     if (updatedRecord.rowIndex !== undefined) {
+      const rowIndex = updatedRecord.rowIndex;
       setModifiedRecords(prev => {
         const newMap = new Map(prev);
         // Si ya existe en modificados, tomamos ese como base por si se editó otro campo antes
-        const existing = newMap.get(updatedRecord.rowIndex);
+        const existing = newMap.get(rowIndex);
         const base = existing || updatedRecord;
-        newMap.set(updatedRecord.rowIndex, { ...base, [field]: newValue });
+        newMap.set(rowIndex, { ...base, [field]: newValue });
         return newMap;
       });
     }
