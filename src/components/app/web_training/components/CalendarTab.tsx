@@ -24,6 +24,7 @@ interface CalendarTabProps {
   novedades: NovedadesRecord[];
   onEdit?: (record: TrainingRecord) => void;
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
+  onBatchUpdate?: (records: TrainingRecord[]) => Promise<void>;
 }
 
 export default function CalendarTab({
@@ -32,6 +33,7 @@ export default function CalendarTab({
   novedades,
   onEdit,
   onUpdateRecord,
+  onBatchUpdate,
 }: CalendarTabProps) {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -152,6 +154,7 @@ export default function CalendarTab({
           novedades={novedades}
           onEdit={onEdit}
           onUpdateRecord={onUpdateRecord}
+          onBatchUpdate={onBatchUpdate}
         />
       </div>
 

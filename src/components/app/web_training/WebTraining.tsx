@@ -99,6 +99,26 @@ export default function WebTraining() {
     }
   };
 
+  const handleBatchUpdate = async (records: TrainingRecord[]) => {
+    try {
+      setLoading(true);
+      // Actualizar secuencialmente para evitar conflictos en Sheets
+      for (const record of records) {
+        await submitTrainingData({
+          action: "update",
+          data: record,
+          rowIndex: record.rowIndex,
+        });
+      }
+      await loadData(); // Recargar todo una sola vez al final
+    } catch (err) {
+      console.error("Error updating records:", err);
+      setError("Error al actualizar registros");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-blue-50 to-indigo-50 p-8 flex flex-col">
       {/* Sistema de pestañas */}
@@ -159,6 +179,7 @@ export default function WebTraining() {
               novedades={novedades}
               onEdit={isAdmin ? handleEdit : undefined}
               onUpdateRecord={isAdmin ? handleUpdateRecord : undefined}
+              onBatchUpdate={isAdmin ? handleBatchUpdate : undefined}
             />
           )}
 

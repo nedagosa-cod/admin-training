@@ -39,6 +39,7 @@ interface CalendarProps {
   setSelectedDay: (date: Date | null) => void;
   onEdit?: (record: TrainingRecord) => void;
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
+  onBatchUpdate?: (records: TrainingRecord[]) => Promise<void>;
 }
 
 // Interfaz para agrupar eventos por campaña
@@ -166,11 +167,66 @@ export default function Calendar({
   setSelectedDay,
   novedades,
   onUpdateRecord,
+  onBatchUpdate,
 }: CalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<GroupedEvent | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [showActualizaciones, setShowActualizaciones] = useState<boolean>(true);
   const [showIncumplimientos, setShowIncumplimientos] = useState<boolean>(true);
+
+  // Estado para cambios pendientes de guardar [rowIndex -> record]
+  const [modifiedRecords, setModifiedRecords] = useState<Map<number, TrainingRecord>>(new Map());
+
+  // Función para guardar cambios en línea (buffer local)
+  const handleSaveField = async (
+    originalRecord: TrainingRecord,
+    field: keyof TrainingRecord,
+    newValue: string
+  ) => {
+    // Si no hay función de actualización, no hacemos nada
+    if (!onBatchUpdate && !onUpdateRecord) return;
+
+    // Crear registro actualizado
+    const updatedRecord = { ...originalRecord, [field]: newValue };
+
+    // 1. Actualizar UI local (optimistic)
+    if (selectedEvent) {
+      const updatedDesarrollos = selectedEvent.desarrollos.map(cat => {
+        if (cat.originalRecord === originalRecord) {
+          return { ...cat, [field]: newValue, originalRecord: updatedRecord };
+        }
+        return cat;
+      });
+      setSelectedEvent({ ...selectedEvent, desarrollos: updatedDesarrollos });
+    }
+
+    // 2. Guardar en buffer de cambios (usando rowIndex como clave si existe, o alguna clave única)
+    // Asumimos que originalRecord tiene un identificador único o usaremos su referencia si no
+    // Pero TrainingRecord viene de Google Sheets y suele tener rowIndex.
+    // Si no tiene, usaremos el objeto mismo como clave si fuera Map<TrainingRecord, TrainingRecord>, pero React state mejor serializable.
+    // Vamos a usar el rowIndex que viene de Sheets.
+    if (updatedRecord.rowIndex !== undefined) {
+      setModifiedRecords(prev => {
+        const newMap = new Map(prev);
+        // Si ya existe en modificados, tomamos ese como base por si se editó otro campo antes
+        const existing = newMap.get(updatedRecord.rowIndex);
+        const base = existing || updatedRecord;
+        newMap.set(updatedRecord.rowIndex, { ...base, [field]: newValue });
+        return newMap;
+      });
+    }
+  };
+
+  // Guardar todos los cambios
+  const handleSaveChanges = async () => {
+    if (!onBatchUpdate || modifiedRecords.size === 0) return;
+
+    const recordsToSave = Array.from(modifiedRecords.values());
+    await onBatchUpdate(recordsToSave);
+
+    // Limpiar cambios después de guardar
+    setModifiedRecords(new Map());
+  };
 
   // Obtener todos los días del mes actual incluyendo días de semanas anteriores/posteriores
   const monthStart = startOfMonth(currentMonth);
@@ -291,30 +347,7 @@ export default function Calendar({
     });
   };
 
-  // Función para guardar cambios en línea
-  const handleSaveField = async (
-    originalRecord: TrainingRecord,
-    field: keyof TrainingRecord,
-    newValue: string
-  ) => {
-    if (!onUpdateRecord) return;
 
-    const updatedRecord = { ...originalRecord, [field]: newValue };
-
-    // Optimistic update (opcional, por ahora confiamos en el reload del padre)
-    // Pero actualizamos el selectedEvent para que se refleje en el modal abierto
-    if (selectedEvent) {
-      const updatedDesarrollos = selectedEvent.desarrollos.map(cat => {
-        if (cat.originalRecord === originalRecord) {
-          return { ...cat, [field]: newValue, originalRecord: updatedRecord };
-        }
-        return cat;
-      });
-      setSelectedEvent({ ...selectedEvent, desarrollos: updatedDesarrollos });
-    }
-
-    await onUpdateRecord(updatedRecord);
-  };
 
   // Paleta de colores para campañas (50+ colores distintos)
   const campaignColors = [
@@ -1177,6 +1210,30 @@ export default function Calendar({
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Footer con acciones */}
+              <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  onClick={() => setSelectedEvent(null)}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+                {onBatchUpdate && (
+                  <button
+                    onClick={handleSaveChanges}
+                    disabled={modifiedRecords.size === 0}
+                    className={`px-6 py-2 rounded-lg text-white font-bold transition-all transform hover:scale-105 shadow-md flex items-center gap-2
+                      ${modifiedRecords.size > 0
+                        ? "bg-linear-to-r from-blue-600 to-indigo-600 hover:shadow-lg"
+                        : "bg-gray-300 cursor-not-allowed text-gray-500"
+                      }`}
+                  >
+                    <BookCheck className="w-5 h-5" />
+                    Guardar Cambios ({modifiedRecords.size})
+                  </button>
+                )}
               </div>
             </div>
           </div>
