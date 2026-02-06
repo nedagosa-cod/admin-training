@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   fetchGoogleSheetData,
-  fetchSheetFestivosData,
+  fetchMasterData,
   fetchSheetNovedades,
 } from "./utils/utils";
 import type {
@@ -20,6 +20,12 @@ export default function WebTraining() {
   const [data, setData] = useState<TrainingRecord[]>([]);
   const [festivos, setFestivos] = useState<FestivoRecord[]>([]);
   const [novedades, setNovedades] = useState<NovedadesRecord[]>([]);
+  // Listas Maestras
+  const [desarrolladores, setDesarrolladores] = useState<string[]>([]);
+  const [coordinadores, setCoordinadores] = useState<string[]>([]);
+  const [clientes, setClientes] = useState<string[]>([]);
+  const [tiposDesarrollo, setTiposDesarrollo] = useState<string[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>("calendar");
@@ -29,13 +35,18 @@ export default function WebTraining() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [records, festivosData, novedadesData] = await Promise.all([
+      const [records, masterData, novedadesData] = await Promise.all([
         fetchGoogleSheetData(),
-        fetchSheetFestivosData(),
+        fetchMasterData(),
         fetchSheetNovedades(),
       ]);
       setData(records);
-      setFestivos(festivosData);
+      setFestivos(masterData.festivos);
+      setDesarrolladores(masterData.desarrolladores);
+      setCoordinadores(masterData.coordinadores);
+      setClientes(masterData.clientes);
+      setTiposDesarrollo(masterData.tiposDesarrollo);
+
       setNovedades(novedadesData);
       setError(null);
     } catch (err) {
@@ -64,8 +75,8 @@ export default function WebTraining() {
           <button
             onClick={() => setActiveTab("calendar")}
             className={`${activeTab === "calendar"
-                ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                : "text-gray-600 hover:bg-gray-100"
+              ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+              : "text-gray-600 hover:bg-gray-100"
               } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
           >
             📅 Calendario
@@ -73,8 +84,8 @@ export default function WebTraining() {
           <button
             onClick={() => setActiveTab("campaigns")}
             className={`${activeTab === "campaigns"
-                ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                : "text-gray-600 hover:bg-gray-100"
+              ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+              : "text-gray-600 hover:bg-gray-100"
               } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
           >
             📊 Consulta de Campañas
@@ -82,8 +93,8 @@ export default function WebTraining() {
           <button
             onClick={() => setActiveTab("reports")}
             className={`${activeTab === "reports"
-                ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
-                : "text-gray-600 hover:bg-gray-100"
+              ? "bg-linear-to-r from-blue-500 to-indigo-600 text-white shadow-lg"
+              : "text-gray-600 hover:bg-gray-100"
               } flex-1 py-3 px-6 rounded-lg font-semibold text-sm transition-all duration-200 transform hover:scale-105`}
           >
             📈 Reportes
@@ -154,6 +165,10 @@ export default function WebTraining() {
         isOpen={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSuccess={handleSuccessAdd}
+        desarrolladores={desarrolladores}
+        coordinadores={coordinadores}
+        clientes={clientes}
+        tiposDesarrollo={tiposDesarrollo}
       />
 
       {/* Modal de ayuda */}

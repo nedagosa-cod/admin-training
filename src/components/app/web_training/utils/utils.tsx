@@ -114,44 +114,71 @@ export const fetchGoogleSheetData = async (): Promise<TrainingRecord[]> => {
   }
 };
 
-export const fetchSheetFestivosData = async (): Promise<FestivoRecord[]> => {
+export interface MasterData {
+  festivos: FestivoRecord[];
+  desarrolladores: string[];
+  coordinadores: string[];
+  clientes: string[];
+  tiposDesarrollo: string[];
+}
+
+export const fetchMasterData = async (): Promise<MasterData> => {
   try {
     const sheetId = "1iU_X2DpMN2wmPE0-V69NvATwQX7PE_q15IYMcj5EYXY";
     const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&sheet=DATA`;
     const response = await fetch(url);
     const text = await response.text();
-    // Google retorna JSONP, necesitamos extraer el JSON
     const jsonString = text.match(
       /google\.visualization\.Query\.setResponse\(([\s\S\w]+)\);/
     );
 
     if (jsonString && jsonString[1]) {
       const data: SheetData = JSON.parse(jsonString[1]);
-      console.log(jsonString[1]);
-      // Extraer las filas y columnas
       const rows = data.table.rows;
 
-      // Convertir a formato TrainingRecord
-      const formattedData: FestivoRecord[] = rows
-        .slice(0)
-        .map((row: SheetRow) => {
-          return {
-            festivo: row.c[3] ? String(row.c[3].v) : null,
-            festividad: row.c[4] ? String(row.c[4].v) : null,
-          };
-        });
+      const festivos: FestivoRecord[] = [];
+      const desarrolladores = new Set<string>();
+      const coordinadores = new Set<string>();
+      const clientes = new Set<string>();
+      const tiposDesarrollo = new Set<string>();
 
-      console.log("📊 Datos de Google Sheets:");
-      console.log("Total de filas:", formattedData.length);
-      console.table(formattedData);
+      rows.slice(0).forEach((row: SheetRow) => {
+        // Festivos (Columnas D=3, E=4)
+        if (row.c[3] && row.c[4]) {
+          festivos.push({
+            festivo: String(row.c[3].v),
+            festividad: String(row.c[4].v),
+          });
+        }
 
-      return formattedData;
+        // Desarrolladores (Columna A = 0)
+        if (row.c[0] && row.c[0].v) desarrolladores.add(String(row.c[0].v));
+
+        // Coordinadores (Columna G = 6)
+        if (row.c[6] && row.c[6].v) coordinadores.add(String(row.c[6].v));
+
+        // Clientes (Columna I = 8)
+        if (row.c[8] && row.c[8].v) clientes.add(String(row.c[8].v));
+
+        // Tipos de Desarrollo (Columna K = 10)
+        if (row.c[10] && row.c[10].v) tiposDesarrollo.add(String(row.c[10].v));
+      });
+
+      console.log("📊 Datos Maestros cargados");
+
+      return {
+        festivos,
+        desarrolladores: Array.from(desarrolladores).sort(),
+        coordinadores: Array.from(coordinadores).sort(),
+        clientes: Array.from(clientes).sort(),
+        tiposDesarrollo: Array.from(tiposDesarrollo).sort(),
+      };
     }
 
-    return [];
+    return { festivos: [], desarrolladores: [], coordinadores: [], clientes: [], tiposDesarrollo: [] };
   } catch (error) {
-    console.error("Error al cargar datos de Google Sheets:", error);
-    return [];
+    console.error("Error al cargar datos maestros:", error);
+    return { festivos: [], desarrolladores: [], coordinadores: [], clientes: [], tiposDesarrollo: [] };
   }
 };
 

@@ -6,6 +6,10 @@ interface AddTrainingModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    desarrolladores: string[];
+    coordinadores: string[];
+    clientes: string[];
+    tiposDesarrollo: string[];
 }
 
 // Campos comunes para la cabecera
@@ -15,7 +19,6 @@ interface HeaderData {
     segmento: string;
     desarrollador: string;
     segmentoMenu: string;
-    observaciones: string;
     campana: string;
     formador: string;
     fechaSolicitud: string;
@@ -31,6 +34,7 @@ interface RowData {
     fechaInicio: string;
     fechaFin: string;
     estado: string;
+    observaciones: string;
 }
 
 const INITIAL_HEADER: HeaderData = {
@@ -39,7 +43,6 @@ const INITIAL_HEADER: HeaderData = {
     segmento: "",
     desarrollador: "",
     segmentoMenu: "",
-    observaciones: "",
     campana: "",
     formador: "",
     fechaSolicitud: new Date().toISOString().split("T")[0], // Hoy por defecto
@@ -54,9 +57,18 @@ const INITIAL_ROW: RowData = {
     fechaInicio: "",
     fechaFin: "",
     estado: "Pendiente",
+    observaciones: "",
 };
 
-export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrainingModalProps) {
+export default function AddTrainingModal({
+    isOpen,
+    onClose,
+    onSuccess,
+    desarrolladores,
+    coordinadores,
+    clientes,
+    tiposDesarrollo
+}: AddTrainingModalProps) {
     const [headerData, setHeaderData] = useState<HeaderData>(INITIAL_HEADER);
     const [rows, setRows] = useState<RowData[]>([{ ...INITIAL_ROW }]);
     const [submitting, setSubmitting] = useState(false);
@@ -91,11 +103,10 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
 
         try {
             // Validaciones básicas
-            if (!headerData.cliente || !headerData.campana) {
-                throw new Error("Cliente y Campaña son obligatorios");
-            }
-
-            // Construir payload
+            if (!headerData.cliente) {
+                setError("Por favor complete los campos obligatorios (Cliente)");
+                return;
+            }    // Construir payload
             const payload: TrainingRecord[] = rows.map((row) => ({
                 ...headerData,
                 // Mapear campos de fila a TrainingRecord
@@ -106,6 +117,7 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                 fechaInicio: row.fechaInicio,
                 fechaFin: row.fechaFin,
                 estado: row.estado,
+                observaciones: row.observaciones,
                 // Campos que no usamos en el form pero requiere la interfaz
                 // Aseguramos que sean string vacíos o lo que corresponda si son null en la interfaz
                 // La interfaz tiene 'string | null', así que null es válido o string vacío.
@@ -172,35 +184,32 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Coordinador</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         name="coordinador"
                                         value={headerData.coordinador}
                                         onChange={handleHeaderChange}
                                         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    />
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        {coordinadores.map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Cliente *</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         name="cliente"
                                         required
                                         value={headerData.cliente}
                                         onChange={handleHeaderChange}
                                         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Campaña *</label>
-                                    <input
-                                        type="text"
-                                        name="campana"
-                                        required
-                                        value={headerData.campana}
-                                        onChange={handleHeaderChange}
-                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    />
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        {clientes.map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Segmento</label>
@@ -224,13 +233,17 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Desarrollador</label>
-                                    <input
-                                        type="text"
+                                    <select
                                         name="desarrollador"
                                         value={headerData.desarrollador}
                                         onChange={handleHeaderChange}
                                         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    />
+                                    >
+                                        <option value="">Seleccionar...</option>
+                                        {desarrolladores.map((opt) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-medium text-gray-700 mb-1">Formador</label>
@@ -238,16 +251,6 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                                         type="text"
                                         name="formador"
                                         value={headerData.formador}
-                                        onChange={handleHeaderChange}
-                                        className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                    />
-                                </div>
-                                <div className="md:col-span-4">
-                                    <label className="block text-xs font-medium text-gray-700 mb-1">Observaciones</label>
-                                    <textarea
-                                        name="observaciones"
-                                        rows={2}
-                                        value={headerData.observaciones}
                                         onChange={handleHeaderChange}
                                         className="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
                                     />
@@ -281,6 +284,7 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">F. Inicio</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">F. Fin</th>
                                             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-64">Observaciones</th>
                                             <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider w-10"></th>
                                         </tr>
                                     </thead>
@@ -288,13 +292,16 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                                         {rows.map((row) => (
                                             <tr key={row.id} className="hover:bg-gray-50">
                                                 <td className="px-2 py-2">
-                                                    <input
-                                                        type="text"
+                                                    <select
                                                         value={row.desarrollo}
                                                         onChange={(e) => handleRowChange(row.id, "desarrollo", e.target.value)}
                                                         className="w-full border-gray-200 rounded text-sm focus:ring-blue-500 focus:border-blue-500"
-                                                        placeholder="Tipo..."
-                                                    />
+                                                    >
+                                                        <option value="">Seleccionar...</option>
+                                                        {tiposDesarrollo.map((opt) => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
                                                 </td>
                                                 <td className="px-2 py-2">
                                                     <input
@@ -348,6 +355,15 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                                                         <option value="Finalizada">Finalizada</option>
                                                         <option value="Suspendida">Suspendida</option>
                                                     </select>
+                                                </td>
+                                                <td className="px-2 py-2">
+                                                    <input
+                                                        type="text"
+                                                        value={row.observaciones}
+                                                        onChange={(e) => handleRowChange(row.id, "observaciones", e.target.value)}
+                                                        className="w-full border-gray-200 rounded text-sm focus:ring-blue-500 focus:border-blue-500"
+                                                        placeholder="Obs..."
+                                                    />
                                                 </td>
                                                 <td className="px-2 py-2 text-center">
                                                     {rows.length > 1 && (
@@ -403,7 +419,7 @@ export default function AddTrainingModal({ isOpen, onClose, onSuccess }: AddTrai
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }
