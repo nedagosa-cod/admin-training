@@ -10,6 +10,7 @@ interface AddTrainingModalProps {
     coordinadores: string[];
     clientes: string[];
     tiposDesarrollo: string[];
+    estados: string[];
     isMinimized?: boolean;
     onToggleMinimize?: () => void;
     initialData?: TrainingRecord | null;
@@ -115,6 +116,7 @@ export default function AddTrainingModal({
     coordinadores,
     clientes,
     tiposDesarrollo,
+    estados,
     isMinimized = false,
     onToggleMinimize,
     initialData
@@ -482,10 +484,9 @@ export default function AddTrainingModal({
                                                         onChange={(e) => handleRowChange(row.id, "estado", e.target.value)}
                                                         className="w-full border-gray-200 rounded text-sm focus:ring-blue-500 focus:border-blue-500"
                                                     >
-                                                        <option value="Pendiente">Pendiente</option>
-                                                        <option value="En Curso">En Curso</option>
-                                                        <option value="Finalizada">Finalizada</option>
-                                                        <option value="Suspendida">Suspendida</option>
+                                                        {estados.map((opt) => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
                                                     </select>
                                                 </td>
                                                 <td className="px-2 py-2">

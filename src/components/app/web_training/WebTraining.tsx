@@ -28,6 +28,7 @@ export default function WebTraining() {
   const [coordinadores, setCoordinadores] = useState<string[]>([]);
   const [clientes, setClientes] = useState<string[]>([]);
   const [tiposDesarrollo, setTiposDesarrollo] = useState<string[]>([]);
+  const [estados, setEstados] = useState<string[]>([]);
 
   const [isModalMinimized, setIsModalMinimized] = useState(false);
   const [editingRecord, setEditingRecord] = useState<TrainingRecord | null>(null);
@@ -52,6 +53,7 @@ export default function WebTraining() {
       setCoordinadores(masterData.coordinadores);
       setClientes(masterData.clientes);
       setTiposDesarrollo(masterData.tiposDesarrollo);
+      setEstados(masterData.estados);
 
       setNovedades(novedadesData);
       setError(null);
@@ -194,6 +196,7 @@ export default function WebTraining() {
               onEdit={isAdmin ? handleEdit : undefined}
               onUpdateRecord={isAdmin ? handleUpdateRecord : undefined}
               onBatchUpdate={isAdmin ? handleBatchUpdate : undefined}
+              estados={estados}
             />
           )}
 
@@ -247,6 +250,7 @@ export default function WebTraining() {
           coordinadores={coordinadores}
           clientes={clientes}
           tiposDesarrollo={tiposDesarrollo}
+          estados={estados}
           isMinimized={isModalMinimized}
           onToggleMinimize={() => setIsModalMinimized(!isModalMinimized)}
           initialData={editingRecord}

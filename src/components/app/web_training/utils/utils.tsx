@@ -170,6 +170,7 @@ export interface MasterData {
   coordinadores: string[];
   clientes: string[];
   tiposDesarrollo: string[];
+  estados: string[];
 }
 
 export const fetchMasterData = async (): Promise<MasterData> => {
@@ -191,6 +192,7 @@ export const fetchMasterData = async (): Promise<MasterData> => {
       const coordinadores = new Set<string>();
       const clientes = new Set<string>();
       const tiposDesarrollo = new Set<string>();
+      const estados = new Set<string>();
 
       rows.slice(0).forEach((row: SheetRow) => {
         // Festivos (Columnas D=3, E=4)
@@ -212,6 +214,9 @@ export const fetchMasterData = async (): Promise<MasterData> => {
 
         // Tipos de Desarrollo (Columna K = 10)
         if (row.c[10] && row.c[10].v) tiposDesarrollo.add(String(row.c[10].v));
+
+        // Estados (Columna M = 12)
+        if (row.c[12] && row.c[12].v) estados.add(String(row.c[12].v));
       });
 
       console.log("📊 Datos Maestros cargados");
@@ -222,13 +227,14 @@ export const fetchMasterData = async (): Promise<MasterData> => {
         coordinadores: Array.from(coordinadores).sort(),
         clientes: Array.from(clientes).sort(),
         tiposDesarrollo: Array.from(tiposDesarrollo).sort(),
+        estados: Array.from(estados).sort(),
       };
     }
 
-    return { festivos: [], desarrolladores: [], coordinadores: [], clientes: [], tiposDesarrollo: [] };
+    return { festivos: [], desarrolladores: [], coordinadores: [], clientes: [], tiposDesarrollo: [], estados: [] };
   } catch (error) {
     console.error("Error al cargar datos maestros:", error);
-    return { festivos: [], desarrolladores: [], coordinadores: [], clientes: [], tiposDesarrollo: [] };
+    return { festivos: [], desarrolladores: [], coordinadores: [], clientes: [], tiposDesarrollo: [], estados: [] };
   }
 };
 
@@ -285,9 +291,31 @@ export const submitTrainingData = async (data: TrainingRecord[] | any): Promise<
 
     let payload;
     if (Array.isArray(data)) {
-      payload = { action: 'create', data: data };
+      // Calcular campana para cada registro
+      const recordsWithCampana = data.map((record: any) => ({
+        ...record,
+        campana: `${record.cliente || ""} ${record.segmento || ""}`.trim()
+      }));
+      payload = { action: 'create', data: recordsWithCampana };
     } else {
-      payload = data; // Ya viene con estructura { action, data, rowIndex }
+      // Si es un objeto único (update o create simple)
+      const record = data.data || data; // data.data si viene de {action, data, rowIndex}, o data si es raw
+
+      // Si data tiene estructura { action, data, rowIndex }
+      if (data.data) {
+        const updatedRecord = {
+          ...data.data,
+          campana: `${data.data.cliente || ""} ${data.data.segmento || ""}`.trim()
+        };
+        payload = { ...data, data: updatedRecord };
+      } else {
+        // Si es registro directo (poco probable por como se llama, pero por si acaso)
+        const updatedRecord = {
+          ...data,
+          campana: `${data.cliente || ""} ${data.segmento || ""}`.trim()
+        };
+        payload = updatedRecord;
+      }
     }
 
     await fetch(GAS_URL, {

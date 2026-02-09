@@ -41,6 +41,7 @@ interface CalendarProps {
   onEdit?: (record: TrainingRecord) => void;
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
   onBatchUpdate?: (records: TrainingRecord[], deletedIds?: number[]) => Promise<void>;
+  estados?: string[];
 }
 
 // Interfaz para agrupar eventos por campaña
@@ -169,6 +170,7 @@ export default function Calendar({
   novedades,
   onUpdateRecord,
   onBatchUpdate,
+  estados,
 }: CalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<GroupedEvent | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
@@ -1181,7 +1183,7 @@ export default function Calendar({
                             onSave={(val) => desarrollo.originalRecord && handleSaveField(desarrollo.originalRecord, 'estado', val)}
                             isEditingEnabled={!!onUpdateRecord}
                             type="select"
-                            options={["Entregado", "Finalizado", "Cancelado", "En Proceso", "Proyectado", "Pendiente", "Incumplimiento", "Stand By"]}
+                            options={estados && estados.length > 0 ? estados : ["Entregado", "Finalizado", "Cancelado", "En Proceso", "Proyectado", "Sin Material", "Incumplimiento"]}
                             className={`px-3 py-1.5 rounded-lg text-white font-bold text-sm shadow-md ${getStatusColor(desarrollo.estado)}`}
                           />
                         </div>
