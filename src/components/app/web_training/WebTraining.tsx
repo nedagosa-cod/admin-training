@@ -134,6 +134,21 @@ export default function WebTraining() {
       setLoading(false);
     }
   };
+  const handleAddRecord = async (newRecord: TrainingRecord) => {
+    try {
+      setLoading(true);
+      await submitTrainingData({
+        action: "create",
+        data: newRecord,
+      });
+      await loadData(); // Recargar datos
+    } catch (err) {
+      console.error("Error adding record:", err);
+      setError("Error al agregar el registro");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-50 via-blue-50 to-indigo-50 p-8 flex flex-col">
@@ -196,7 +211,9 @@ export default function WebTraining() {
               onEdit={isAdmin ? handleEdit : undefined}
               onUpdateRecord={isAdmin ? handleUpdateRecord : undefined}
               onBatchUpdate={isAdmin ? handleBatchUpdate : undefined}
+              onAddRecord={isAdmin ? handleAddRecord : undefined}
               estados={estados}
+              tiposDesarrollo={tiposDesarrollo}
             />
           )}
 

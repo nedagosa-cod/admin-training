@@ -42,6 +42,8 @@ interface CalendarProps {
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
   onBatchUpdate?: (records: TrainingRecord[], deletedIds?: number[]) => Promise<void>;
   estados?: string[];
+  onAddRecord?: (record: TrainingRecord) => Promise<void>;
+  tiposDesarrollo?: string[];
 }
 
 // Interfaz para agrupar eventos por campaña
@@ -49,6 +51,10 @@ interface GroupedEvent {
   campana: string;
   coordinador: string | null;
   desarrollador: string | null;
+  cliente: string | null;
+  segmento: string | null;
+  segmentoMenu: string | null;
+  formador: string | null;
   fechaMaterial: string | null;
   fechaInicio: string | null;
   fechaFin: string | null;
@@ -171,11 +177,26 @@ export default function Calendar({
   onUpdateRecord,
   onBatchUpdate,
   estados,
+  onAddRecord,
+  tiposDesarrollo,
 }: CalendarProps) {
   const [selectedEvent, setSelectedEvent] = useState<GroupedEvent | null>(null);
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [showActualizaciones, setShowActualizaciones] = useState<boolean>(true);
   const [showIncumplimientos, setShowIncumplimientos] = useState<boolean>(true);
+
+  // Estado para la creación de nuevo desarrollo en el modal
+  const [isAdding, setIsAdding] = useState(false);
+  const [newDevelopment, setNewDevelopment] = useState<Partial<TrainingRecord>>({
+    desarrollo: "",
+    nombre: "",
+    cantidad: "",
+    fechaMaterial: "",
+    fechaInicio: "",
+    fechaFin: "",
+    estado: "Pendiente",
+    observaciones: ""
+  });
 
   // Estado para cambios pendientes de guardar [rowIndex -> record]
   const [modifiedRecords, setModifiedRecords] = useState<Map<number, TrainingRecord>>(new Map());
@@ -249,6 +270,47 @@ export default function Calendar({
     setDeletedRecordIndices(new Set());
   };
 
+  const handleSaveNewDevelopment = async () => {
+    if (!selectedEvent || !onAddRecord) return;
+
+    // Construir el nuevo registro combinando datos del evento (header) y del formulario
+    const newRecord: TrainingRecord = {
+      // Header data from selectedEvent
+      coordinador: selectedEvent.coordinador,
+      cliente: selectedEvent.cliente,
+      segmento: selectedEvent.segmento,
+      desarrollador: selectedEvent.desarrollador,
+      segmentoMenu: selectedEvent.segmentoMenu,
+      campana: selectedEvent.campana,
+      formador: selectedEvent.formador,
+      fechaSolicitud: new Date().toISOString().split('T')[0], // Default a hoy
+
+      // New development data
+      desarrollo: newDevelopment.desarrollo || "",
+      nombre: newDevelopment.nombre || "",
+      cantidad: newDevelopment.cantidad || "",
+      fechaMaterial: newDevelopment.fechaMaterial || "",
+      fechaInicio: newDevelopment.fechaInicio || "",
+      fechaFin: newDevelopment.fechaFin || "",
+      estado: newDevelopment.estado || "Pendiente",
+      observaciones: newDevelopment.observaciones || "",
+    };
+
+    await onAddRecord(newRecord);
+    setIsAdding(false);
+    setNewDevelopment({
+      desarrollo: "",
+      nombre: "",
+      cantidad: "",
+      fechaMaterial: "",
+      fechaInicio: "",
+      fechaFin: "",
+      estado: "Pendiente",
+      observaciones: ""
+    });
+    setSelectedEvent(null); // Cerrar modal para refrescar o forzar recarga
+  };
+
   // Obtener todos los días del mes actual incluyendo días de semanas anteriores/posteriores
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
@@ -298,6 +360,10 @@ export default function Calendar({
           campana: campana,
           coordinador: event.coordinador,
           desarrollador: event.desarrollador,
+          cliente: event.cliente,
+          segmento: event.segmento,
+          segmentoMenu: event.segmentoMenu,
+          formador: event.formador,
           fechaMaterial: event.fechaMaterial,
           fechaInicio: event.fechaInicio,
           fechaFin: event.fechaFin,
@@ -1143,6 +1209,116 @@ export default function Calendar({
                     {selectedEvent.desarrollos.length > 1 ? "es" : ""})
                   </span>
                 </h4>
+
+                {/* Formulario de Agregar Nuevo Desarrollo */}
+                {onAddRecord && (
+                  <div className="mb-4">
+                    {!isAdding ? (
+                      <button
+                        onClick={() => setIsAdding(true)}
+                        className="flex items-center gap-2 bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 px-4 py-2 rounded-lg transition-colors font-semibold text-sm w-full justification-center"
+                      >
+                        <span className="text-lg">+</span> Agregar Desarrollo a esta Campaña
+                      </button>
+                    ) : (
+                      <div className="bg-white p-4 rounded-lg border border-green-200 shadow-sm animate-in fade-in zoom-in-95 duration-200">
+                        <h5 className="font-bold text-gray-700 mb-3 text-sm">Nuevo Desarrollo</h5>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Tipo Desarrollo</label>
+                            <select
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.desarrollo || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, desarrollo: e.target.value })}
+                            >
+                              <option value="">Seleccionar...</option>
+                              {tiposDesarrollo?.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          </div>
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Nombre Tema</label>
+                            <input
+                              type="text"
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.nombre || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, nombre: e.target.value })}
+                              placeholder="Nombre del tema..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Cantidad</label>
+                            <input
+                              type="text"
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.cantidad || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, cantidad: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha Material</label>
+                            <input
+                              type="date"
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.fechaMaterial || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, fechaMaterial: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha Inicio</label>
+                            <input
+                              type="date"
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.fechaInicio || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, fechaInicio: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Fecha Fin</label>
+                            <input
+                              type="date"
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.fechaFin || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, fechaFin: e.target.value })}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Estado</label>
+                            <select
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.estado || "Pendiente"}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, estado: e.target.value })}
+                            >
+                              {estados?.map(e => <option key={e} value={e}>{e}</option>) || <option>Pendiente</option>}
+                            </select>
+                          </div>
+                          <div className="md:col-span-3">
+                            <label className="block text-xs font-semibold text-gray-500 mb-1">Observaciones</label>
+                            <input
+                              type="text"
+                              className="w-full text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                              value={newDevelopment.observaciones || ""}
+                              onChange={e => setNewDevelopment({ ...newDevelopment, observaciones: e.target.value })}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => setIsAdding(false)}
+                            className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-md"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={handleSaveNewDevelopment}
+                            className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 shadow-sm"
+                          >
+                            Guardar Nuevo Desarrollo
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   {selectedEvent.desarrollos.map((desarrollo, idx) => (

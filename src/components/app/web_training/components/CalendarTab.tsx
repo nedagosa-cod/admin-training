@@ -25,7 +25,9 @@ interface CalendarTabProps {
   onEdit?: (record: TrainingRecord) => void;
   onUpdateRecord?: (record: TrainingRecord) => Promise<void>;
   onBatchUpdate?: (records: TrainingRecord[], deletedIds?: number[]) => Promise<void>;
+  onAddRecord?: (record: TrainingRecord) => Promise<void>;
   estados?: string[];
+  tiposDesarrollo?: string[];
 }
 
 export default function CalendarTab({
@@ -35,7 +37,9 @@ export default function CalendarTab({
   onEdit,
   onUpdateRecord,
   onBatchUpdate,
+  onAddRecord,
   estados,
+  tiposDesarrollo,
 }: CalendarTabProps) {
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -157,7 +161,9 @@ export default function CalendarTab({
           onEdit={onEdit}
           onUpdateRecord={onUpdateRecord}
           onBatchUpdate={onBatchUpdate}
+          onAddRecord={onAddRecord}
           estados={estados}
+          tiposDesarrollo={tiposDesarrollo}
         />
       </div>
 
