@@ -299,7 +299,7 @@ export const submitTrainingData = async (data: TrainingRecord[] | any): Promise<
       payload = { action: 'create', data: recordsWithCampana };
     } else {
       // Si es un objeto único (update o create simple)
-      const record = data.data || data; // data.data si viene de {action, data, rowIndex}, o data si es raw
+      // const record = data.data || data; // Eliminated unused variable
 
       // Si data tiene estructura { action, data, rowIndex }
       if (data.data) {
